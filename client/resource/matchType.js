@@ -1,6 +1,6 @@
+const postProcessors = require('./postProcessors');
 const { VALUE, SIGNATURE, CODEBLOCK, TITLE, INFO } = require("../enum/hoverDisplay");
 const { option } = require('./displayConfig');
-const postProcessors = require('./postProcessors');
 
 // Match types define the possible types of identifiers that can be found. The config for a match type tells the extension 
 // all the necessary data it needs for finding declarations, building hover texts, and finding references.
@@ -105,7 +105,8 @@ const matchType = {
     id: 'ENUM', types: ['enum'], 
     displayConfig: {[option.LANGUAGE]: 'enumconfig', [option.CONFIG_INCLUSIONS]: ['inputtype', 'outputtype']},
     declarationConfig: config('[NAME]', ['enum'], [TITLE]),
-    referenceConfig: config('NAME', ['rs2'], [TITLE, INFO, CODEBLOCK])
+    referenceConfig: config('NAME', ['rs2'], [TITLE, INFO, CODEBLOCK]),
+    postProcessor: postProcessors.enumPostProcessor
   },
   DBROW: {
     id: 'DBROW', types: ['dbrow'], 
@@ -129,7 +130,8 @@ const matchType = {
     id: 'PARAM', types: ['param'], 
     displayConfig: {[option.LANGUAGE]: 'paramconfig'},
     declarationConfig: config('[NAME]', ['param'], [TITLE]),
-    referenceConfig: config('NAME', ['rs2', 'loc', 'npc', 'hunt', 'struct', 'obj'], [TITLE, INFO, CODEBLOCK])
+    referenceConfig: config('NAME', ['rs2', 'loc', 'npc', 'hunt', 'struct', 'obj'], [TITLE, INFO, CODEBLOCK]),
+    postProcessor: postProcessors.paramPostProcessor
   },
   COMMAND: {
     id: 'COMMAND', types: [], 
@@ -161,11 +163,27 @@ const matchType = {
     declarationConfig: config('[NAME]', ['mesanim'], [TITLE]),
     referenceConfig: config('<p,NAME>', ['rs2'], [TITLE, INFO])
   },
+  STRUCT: {
+    id: 'STRUCT', types: ['struct'],
+    displayConfig: {[option.LANGUAGE]: 'structconfig'},
+    declarationConfig: config('[NAME]', ['struct'], [TITLE]),
+    referenceConfig: config('NAME', ['rs2', 'obj', 'npc', 'enum', 'inv', 'dbrow', 'param', 'hunt'], [TITLE, INFO])
+  },
   COORDINATES: {
     id: 'COORDINATES', types: [], hoverOnly: true, 
     referenceConfig: config(null, null, [TITLE, VALUE]),
     postProcessor: postProcessors.coordPostProcessor
   },
+  CONFIG_KEY: {
+    id: 'CONFIG_KEY', types: [], hoverOnly: true,
+    referenceConfig: config(null, null, [TITLE, INFO]),
+    postProcessor: postProcessors.configKeyPostProcessor
+  },
+  TRIGGER: {
+    id: 'TRIGGER', types: [], hoverOnly: true,
+    referenceConfig: config(null, null, [TITLE, INFO]),
+    postProcessor: postProcessors.triggerPostProcessor
+  }
 };
 
 function config(format, fileTypesToSearch, hoverDisplayItems=[], fileToSearch=null) {
