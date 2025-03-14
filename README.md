@@ -37,7 +37,7 @@ git clone https://github.com/LostCityRS/RuneScriptLanguage.git
 cd RuneScriptLanguage
 npm install -g @vscode/vsce
 vsce package
-codium --install-extension runescriptlanguage-0.2.0.vsix
+codium --install-extension runescriptlanguage-0.2.1.vsix
 ```
 
 * <i>Be sure to change the version number as needed</i>
