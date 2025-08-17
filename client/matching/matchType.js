@@ -24,7 +24,7 @@ const matchType = {
     id: 'LOCAL_VAR', types: [], fileTypes: ['rs2'], cache: false, allowRename: true, 
   },
   GLOBAL_VAR: {
-    id: 'GLOBAL_VAR', types: [], fileTypes: ['varp', 'vars', 'varn'], cache: true, allowRename: true, 
+    id: 'GLOBAL_VAR', types: ['var'], fileTypes: ['varp', 'varbit', 'vars', 'varn'], cache: true, allowRename: true, 
     hoverConfig: {[DECLARATION_HOVER_ITEMS]: [TITLE, INFO], [REFERENCE_HOVER_ITEMS]: [TITLE, INFO, CODEBLOCK], [LANGUAGE]: 'varpconfig'},
     postProcessor: dataTypePostProcessor
   },

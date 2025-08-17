@@ -21,7 +21,12 @@ function appendTitle(name, type, matchId, markdown, id, isCert) {
   } else if (id) {
     name = `${name} [${id}]`;
   }
-  markdown.appendMarkdown(`<img src="${type}.png">&ensp;<b>${matchId}</b>&ensp;${name}`);
+  // <img src="${type}.png">&ensp;
+  if (matchId === 'GLOBAL_VAR') {
+    markdown.appendMarkdown(`<b>${type.toUpperCase()}</b>&ensp;${name}`);
+  } else {
+    markdown.appendMarkdown(`<b>${matchId}</b>&ensp;${name}`);
+  }
 }
 
 function appendInfo(identifier, displayItems, markdown) {

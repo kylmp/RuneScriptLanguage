@@ -45,7 +45,7 @@
                 {
                     "comment": "Config properties",
                     "name": "entity.name.type.objconfig",
-                    "match": "^(2dzoom|2dxan|2dyan|2dzan|2dxof|2dyof|recol[1-6][sd]|cost|respawnrate|code9|stackable|members|tradeable|wearpos|wearpos2|wearpos3|weight|count)(?==)"
+                    "match": "^(2dzoom|2dxan|2dyan|2dzan|2dxof|2dyof|recol[1-6][sd]|cost|respawnrate|code9|stackable|members|tradeable|wearpos|wearpos2|wearpos3|weight|count|team|ambient|contrast|resizex|resizey|resizez)(?==)"
                 },
                 {
                     "comment": "Numeric values",
@@ -69,7 +69,7 @@
                 },
                 {
                     "comment": "Reference values",
-                    "match": "^(model|manwear[2-3]|womanwear[2-3]|manhead2?|womanhead2?|category|code10)=(.+)",
+                    "match": "^(model|manwear[2-3]|womanwear[2-3]|manhead2?|womanhead2?|category|code10|certlink|certtemplate)=(.+)",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.objconfig.key"

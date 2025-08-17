@@ -22,6 +22,9 @@ const configKeyInfo = expandInfo({
   count: { 'obj': 'Object to use when the based on the stack size of an item' },
   respawnrate: { 'obj, npc': 'Respawn rate of this $TYPE, in game ticks' },
   category: { 'any': 'The category this $TYPE belongs to, multiple categories are possible\n\nCan be used with category engine commands such as <b>inv_totalcat</b>\n\nAlso can be used in triggers by preceeding the category with an underscore (_)\n\nEx: [oplocu,_watersource] is a script which applies to all items with the category \'watersource\'' },
+  basevar: { 'varbit': 'The base varp backing this varbit.' },
+  startbit: { 'varbit': 'The starting bit range on the basevar to limit this view to.' },
+  endbit: { 'varbit': 'The ending bit range on the basevar to limit this view to.' },
 });
 function expandInfo(obj) {
   Object.keys(obj).forEach(key => obj[key] = expandCsvKeyObject(obj[key]));

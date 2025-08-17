@@ -117,7 +117,7 @@
                 },
                 {
                     "comment": "Interface font values",
-                    "match": "^(font)=(p11|p12|b12|q8)?",
+                    "match": "^(font)=(p11_full|p12_full|b12_full|q8_full)?",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"

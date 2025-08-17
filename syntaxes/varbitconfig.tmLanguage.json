@@ -1,6 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-    "name": "floconfig",
+    "name": "varbitconfig",
     "patterns": [
         {
             "include": "#comments"
@@ -27,60 +27,43 @@
             "patterns": [
                 {
                     "comment": "[name]",
-                    "name": "entity.name.function.floconfig",
+                    "name": "entity.name.function.varbitconfig",
                     "match": "\\[\\w+\\]"
                 },
                 {
-                    "comment": "Config properties",
-                    "name": "entity.name.type.objconfig",
-                    "match": "^(overlay|occlude)(?==)"
-                },
-                {
                     "comment": "Numeric values",
-                    "name": "constant.numeric.floconfig",
+                    "name": "constant.numeric.varbitconfig",
                     "match": "\\b\\d+\\b"
                 },
                 {
                     "comment": "Boolean values, part of property",
-                    "name": "variable.language.floconfig",
+                    "name": "variable.language.varbitconfig",
                     "match": "\\b(?<==)(yes|no|true|false)\\b"
                 },
                 {
                     "comment": "Constants",
-                    "name": "constant.language.floconfig",
+                    "name": "constant.language.varbitconfig",
                     "match": "\\b\\^\\w+\\b"
                 },
                 {
-                    "comment": "Coord values",
-                    "name": "constant.numeric.floconfig",
-                    "match": "\\b(\\d+_){4}\\d+\\b"
+                    "comment": "Config properties",
+                    "name": "entity.name.type.objconfig",
+                    "match": "^(startbit|endbit)(?==)"
                 },
                 {
-                    "comment": "Reference values",
-                    "match": "^(texture)=(.+)",
+                    "comment": "Base varp value",
+                    "match": "^(basevar)=(.+)",
                     "captures": {
                         "1": {
-                            "name": "entity.name.type.floconfig.key"
+                            "name": "entity.name.type.varbitconfig.key"
                         },
                         "2": {
-                            "name": "variable.name.floconfig.value"
-                        }
-                    }
-                },
-                {
-                    "comment": "Flo colour values",
-                    "match": "^(colour|mapcolour)=(0[xX][0-9a-fA-F]+)?",
-                    "captures": {
-                        "1": {
-                            "name": "entity.name.type.interface.key"
-                        },
-                        "2": {
-                            "name": "constant.numeric.interface"
+                            "name": "variable.name.varbitconfig.value"
                         }
                     }
                 }
             ]
         }
     },
-    "scopeName": "source.floconfig"
+    "scopeName": "source.varbitconfig"
 }

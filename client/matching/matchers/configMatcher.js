@@ -21,7 +21,7 @@ function configMatcher(context) {
 
 function declarationMatcher(context) {
   switch (context.file.type) {
-    case "varp": case "varn": case "vars": return declaration(matchType.GLOBAL_VAR);
+    case "varp": case "varbit": case "varn": case "vars": return declaration(matchType.GLOBAL_VAR);
     case "obj": return declaration(matchType.OBJ);
     case "loc": return declaration(matchType.LOC);
     case "npc": return declaration(matchType.NPC);

@@ -4,7 +4,7 @@
     "publisher": "2004scape",
     "repository": "https://github.com/LostCityRS/RuneScriptLanguage",
     "description": "Syntax highlighting for RuneScript.",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "icon": "icons/icon-min.png",
     "engines": {
         "vscode": "^1.75.0"
@@ -174,6 +174,20 @@
                 "icon": {
                     "dark": "./icons/varp.png",
                     "light": "./icons/varp.png"
+                }
+            },
+            {
+                "id": "varbitconfig",
+                "aliases": [
+                    "Var Bit Config"
+                ],
+                "extensions": [
+                    ".varbit"
+                ],
+                "configuration": "./language-configuration/confscript.language-configuration.json",
+                "icon": {
+                    "dark": "./icons/varbit.png",
+                    "light": "./icons/varbit.png"
                 }
             },
             {
@@ -437,6 +451,11 @@
                 "language": "varpconfig",
                 "scopeName": "source.varpconfig",
                 "path": "./syntaxes/varpconfig.tmLanguage.json"
+            },
+            {
+                "language": "varbitconfig",
+                "scopeName": "source.varbitconfig",
+                "path": "./syntaxes/varbitconfig.tmLanguage.json"
             },
             {
                 "language": "varnconfig",
