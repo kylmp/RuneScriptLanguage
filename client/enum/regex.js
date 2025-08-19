@@ -14,7 +14,8 @@ const regex = {
   TRIGGER_LINE: /\[\w+,(\.)?\w+(:\w+)?\]/,
   TRIGGER_DEFINITION: /\[.+,.+\](\([\w, :\.$]*\))?(\([\w, :\.$]*\))?/, 
   INFO_MATCHER: /\/\/[ ]{0,1}(desc|info):(.+)/,
-  SWITCH_CASE: /\s*case.+/
+  SWITCH_CASE: /\s*case.+/,
+  COLOR24: /(colour|mapcolour|activecolour|overcolour|activeovercolour)=(\w+)/g
 }
 
 module.exports = regex;

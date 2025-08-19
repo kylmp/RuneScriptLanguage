@@ -69,7 +69,7 @@
                 },
                 {
                     "comment": "Reference values",
-                    "match": "^(model|category|anim|retex[1-6][sd]|multivar|unpacked_\\d|unpacked2_\\d)=(.+)",
+                    "match": "^(model|category|anim|retex[1-6][sd]|multivar|model\\d)=(.+)",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.locconfig.key"

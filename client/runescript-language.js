@@ -9,8 +9,9 @@ const commands = require('./provider/vscodeCommands');
 const signatureHelp = require('./provider/signatureHelpProvider');
 const configHelp = require('./provider/configHelpProvider');
 const completionProvider = require('./provider/completionProvider');
+const color24Provider = require('./provider/color24Provider.js');
 
-const languages = ['runescript','locconfig','objconfig','npcconfig','dbtableconfig','dbrowconfig','paramconfig','structconfig','enumconfig','varpconfig','varbitconfig','varnconfig','varsconfig','invconfig','seqconfig','spotanimconfig','mesanimconfig','idkconfig','huntconfig','constants','interface','pack'];
+const languages = ['runescript','locconfig','objconfig','npcconfig','dbtableconfig','dbrowconfig','paramconfig','structconfig','enumconfig','varpconfig','varbitconfig','varnconfig','varsconfig','invconfig','seqconfig','spotanimconfig','mesanimconfig','idkconfig','huntconfig','constants','interface','pack','floconfig'];
 
 function activate(context) {
     // Register commands created by this extension
@@ -35,8 +36,14 @@ function activate(context) {
         vscode.languages.registerCompletionItemProvider(language, completionProvider.provider, ...completionProvider.triggers);
         context.subscriptions.push(vscode.languages.registerDefinitionProvider(language, definitionProvider));
         context.subscriptions.push(vscode.languages.registerReferenceProvider(language, referenceProvider));
-        if (language.endsWith('config')) {
+
+        if (language === 'floconfig' || language === 'interface') {
+            vscode.languages.registerColorProvider(language, color24Provider);
+        } else if (language.endsWith('config')) {
             vscode.languages.registerColorProvider(language, recolorProvider);
+        }
+
+        if (language.endsWith('config')) {
             vscode.languages.registerSignatureHelpProvider(language, configHelp.provider, configHelp.metadata);
         }
     }
