@@ -33,7 +33,7 @@
                 {
                     "comment": "Config properties",
                     "name": "entity.name.type.spotanimconfig",
-                    "match": "^(resizeh|resizev|orientation|ambient|contrast|recol[1-6][sd]|hasalpha)(?==)"
+                    "match": "^(resizeh|resizev|angle|ambient|contrast|recol[1-6][sd]|hasalpha)(?==)"
                 },
                 {
                     "comment": "Numeric values",
