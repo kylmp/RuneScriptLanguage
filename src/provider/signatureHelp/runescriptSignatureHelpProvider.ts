@@ -2,7 +2,7 @@ import type { Position, SignatureHelpProvider, SignatureHelpProviderMetadata, Te
 import { ParameterInformation, SignatureHelp, SignatureInformation } from 'vscode';
 import { TRIGGER, UNKNOWN } from '../../matching/matchType';
 import { runescriptTrigger } from '../../resource/triggers';
-import { forceRebuild } from '../../core/eventHandlers';
+import { waitForActiveFileRebuild } from '../../core/eventHandlers';
 import { getCallStateAtPosition } from '../../parsing/lineParser';
 import { getCallIdentifier } from '../../cache/activeFileCache';
 
@@ -74,7 +74,7 @@ let lastRequestId = 0;
 async function getParametersHelp(document: TextDocument, position: Position): Promise<SignatureHelp | undefined> {
   // We need the parser and active file cache states up to date
   const requestId = ++lastRequestId;
-  await forceRebuild(document);
+  await waitForActiveFileRebuild(document);
   if (requestId !== lastRequestId) return undefined; // guard debounce, only continue with 1 result
 
   // Get the callState at the position in the line of text to get the call info and param index

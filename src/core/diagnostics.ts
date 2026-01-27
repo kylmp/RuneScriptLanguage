@@ -32,7 +32,7 @@ export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult
   const diagnosticsList: Diagnostic[] = [];
   for (const result of matchResults) {
     // Skip these types as they never have diagnostics
-    if ((result.context.matchType.noop || result.context.matchType.hoverOnly)) {
+    if (result.context.matchType.noop || result.context.matchType.hoverOnly) {
       continue;
     }
 

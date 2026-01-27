@@ -4,14 +4,14 @@ import { clearAllDiagnostics } from "./diagnostics";
 import { getFileText, isActiveFile, isValidFile } from "../utils/fileUtils";
 import { addUris, removeUris } from "../cache/projectFilesCache";
 import { eventAffectsSetting, getSettingValue, Settings } from "./settings";
-import { clearDevModeOutput, initDevMode, logEvent, logFileEvent, logSettingsEvent } from "./devMode";
+import { clearDevModeOutput, initDevMode, logEvent, logFileEvent, logSettingsEvent, LogType } from "./devMode";
 import { getLines } from "../utils/stringUtils";
-import { clearFile, processAllFiles, queueFileRebuild, rebuildFileChanges } from "./manager";
+import { clearFile, processAllFiles, queueFileRebuild } from "./manager";
 import { monitoredFileTypes } from "../runescriptExtension";
+import { reparseFileWithChanges } from "../parsing/fileParser";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
-const forceDebounceTimeMs = 75; // debounce time for force rebuilds (used by signature help and completion providers)
 
 export function registerEventHandlers(context: ExtensionContext): void {
   const patterns = Array.from(monitoredFileTypes, ext => `**/*.${ext}`);
@@ -37,93 +37,86 @@ export function registerEventHandlers(context: ExtensionContext): void {
 let pendingChanges: TextDocumentContentChangeEvent[] = [];
 let pendingDocument: TextDocument | undefined;
 let pendingTimer: NodeJS.Timeout | undefined;
-let forcePendingDocument: TextDocument | undefined;
-let forceTimer: NodeJS.Timeout | undefined;
-let forcePromise: Promise<void> | undefined;
-let forceResolve: (() => void) | undefined;
+let pendingRebuildPromise: Promise<void> | undefined;
+let pendingRebuildResolve: (() => void) | undefined;
+const lastRebuildVersionByUri = new Map<string, number>();
+const rebuildWaiters: Array<{ uri: string; version: number; resolve: () => void }> = [];
 function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void {
-  if (!isActiveFile(textChangeEvent.document.uri)) return;
-  if (!isValidFile(textChangeEvent.document.uri)) return;
+  if (!isActiveFile(textChangeEvent.document.uri) || !isValidFile(textChangeEvent.document.uri)) return;
 
   pendingDocument = textChangeEvent.document;
   pendingChanges.push(...textChangeEvent.contentChanges);
 
   if (pendingTimer) clearTimeout(pendingTimer);
+  if (!pendingRebuildPromise) {
+    pendingRebuildPromise = new Promise<void>((resolve) => {
+      pendingRebuildResolve = resolve;
+    });
+  }
   pendingTimer = setTimeout(() => {
-    if (!pendingDocument) return;
+    const doc = pendingDocument;
+    if (!doc) return;
+    logFileEvent(doc.uri, LogType.ActiveFileTextChanged, `partial reparse`);
     const changes = pendingChanges;
     pendingChanges = [];
     pendingTimer = undefined;
-    const linesReparsed = rebuildFileChanges(pendingDocument, changes);
-    logFileEvent(pendingDocument.uri, EventType.ActiveFileTextChanged, `${linesReparsed} lines reparsed`);
+    const parsedFile = reparseFileWithChanges(doc, changes);
+    void queueFileRebuild(doc.uri, getLines(doc.getText()), parsedFile).finally(() => {
+      lastRebuildVersionByUri.set(doc.uri.fsPath, doc.version);
+      for (let i = rebuildWaiters.length - 1; i >= 0; i--) {
+        const waiter = rebuildWaiters[i]!;
+        if (waiter.uri === doc.uri.fsPath && waiter.version <= doc.version) {
+          rebuildWaiters.splice(i, 1);
+          waiter.resolve();
+        }
+      }
+      const resolve = pendingRebuildResolve;
+      pendingRebuildPromise = undefined;
+      pendingRebuildResolve = undefined;
+      resolve?.();
+    });
   }, debounceTimeMs);
 }
 
-/**
- * Force rebuild a file and cancel any pending (partial) text doc change event debounce
- * @param document document to force the rebuild on
- * @returns a promise which resolves only when the document has finished being rebuilt
- */
-export function forceRebuild(document: TextDocument): Promise<void> {
-  if (pendingTimer) clearTimeout(pendingTimer);
-  pendingChanges = [];
-  pendingTimer = undefined;
-  pendingDocument = undefined;
-  forcePendingDocument = document;
-  if (forceTimer) clearTimeout(forceTimer);
-  if (!forcePromise) {
-    forcePromise = new Promise<void>((resolve) => {
-      forceResolve = resolve;
-    });
-  }
-  forceTimer = setTimeout(() => {
-    const doc = forcePendingDocument;
-    const resolve = forceResolve;
-    forcePendingDocument = undefined;
-    forceTimer = undefined;
-    forcePromise = undefined;
-    forceResolve = undefined;
-    if (!doc) {
-      resolve?.();
-      return;
-    }
-    void queueFileRebuild(doc.uri, getLines(doc.getText())).finally(() => {
-      resolve?.();
-    });
-  }, forceDebounceTimeMs);
-  return forcePromise;
+export function waitForActiveFileRebuild(document: TextDocument, version = document.version): Promise<void> {
+  const uri = document.uri.fsPath;
+  const lastVersion = lastRebuildVersionByUri.get(uri) ?? -1;
+  if (lastVersion >= version) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    rebuildWaiters.push({ uri, version, resolve });
+  });
 }
 
 async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<void> {
   if (!editor) return;
   if (!isValidFile(editor.document.uri)) return;
-  logFileEvent(editor.document.uri, EventType.ActiveFileChanged, 'full reparse');
+  logFileEvent(editor.document.uri, LogType.ActiveFileChanged, 'full reparse');
   updateFileFromDocument(editor.document);
 }
 
 function onDeleteFile(uri: Uri) {
   if (!isValidFile(uri)) return;
-  logFileEvent(uri, EventType.FileDeleted, 'relevant cache entries invalidated');
+  logFileEvent(uri, LogType.FileDeleted, 'relevant cache entries invalidated');
   clearFile(uri);
   removeUris([uri]);
 }
 
 function onCreateFile(uri: Uri) {
   if (!isValidFile(uri)) return;
-  logFileEvent(uri, EventType.FileCreated, 'full parse');
+  logFileEvent(uri, LogType.FileCreated, 'full parse');
   void updateFileFromUri(uri);
   addUris([uri]);
 }
 
 function onChangeFile(uri: Uri) {
-  if (isActiveFile(uri)) return; // let the change document text event handle active file changes
+  if (isActiveFile(uri)) return; // let the active document text change event handle active file changes
   if (!isValidFile(uri)) return;
-  logFileEvent(uri, EventType.FileChanged, 'full reparse');
+  logFileEvent(uri, LogType.FileChanged, 'full reparse');
   void updateFileFromUri(uri);
 }
 
 function onGitBranchChange() {
-  logEvent(EventType.GitBranchChanged, 'full cache rebuild');
+  logEvent(LogType.GitBranchChanged, 'full cache rebuild');
   processAllFiles();
 }
 
@@ -147,15 +140,4 @@ function onSettingsChange(event: ConfigurationChangeEvent) {
     logSettingsEvent(Settings.DevMode);
     getSettingValue(Settings.DevMode) ? initDevMode() : clearDevModeOutput();
   }
-}
-
-export enum EventType {
-  FileSaved = 'file saved',
-  ActiveFileTextChanged = 'active file text changed',
-  ActiveFileChanged = 'active document changed',
-  FileDeleted = 'file deleted',
-  FileCreated = 'file created',
-  FileChanged = 'file changed',
-  SettingsChanged = 'settings changed',
-  GitBranchChanged = 'git branch changed'
 }

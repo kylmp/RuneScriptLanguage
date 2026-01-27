@@ -1,7 +1,7 @@
 import type { Position, TextDocument} from 'vscode';
 import { ParameterInformation, SignatureHelp, SignatureInformation } from 'vscode';
 import { buildMatchContext } from '../../utils/matchUtils';
-import { forceRebuild } from '../../core/eventHandlers';
+import { waitForActiveFileRebuild } from '../../core/eventHandlers';
 import { parseLineWithStateSnapshot } from '../../parsing/lineParser';
 import { getFileInfo } from '../../utils/fileUtils';
 import { getConfigLineMatch } from '../../matching/matchers/configMatcher';
@@ -17,7 +17,7 @@ export const configHelpProvider = {
   async provideSignatureHelp(document: TextDocument, position: Position) {
     // Try to find a config line match for current cursor position to display signature help for
     const requestId = ++lastRequestId;
-    await forceRebuild(document);
+    await waitForActiveFileRebuild(document);
     if (requestId !== lastRequestId) return undefined; // guard debounce, only continue with 1 result
     let str = document.lineAt(position.line).text;
     str = str.substring(0, position.character) + 'temp' + str.substring(position.character);

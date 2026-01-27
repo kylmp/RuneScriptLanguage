@@ -1,5 +1,5 @@
 import type { OutputChannel, Uri } from "vscode";
-import { EventType } from "./eventHandlers";
+import type { MatchResult, ParsedWord } from "../types";
 import { window } from "vscode";
 import { version as packageVersion } from '../../package.json';
 import { processAllFiles } from "./manager";
@@ -135,7 +135,29 @@ function formatMs(ms: number) {
   return `${Math.round(ms)} ms`;
 }
 
-export function logFileEvent(uri: Uri, event: EventType, extra?: string) {
+/**
+ * Converts a number of milliseconds into a string to 2 decimal places
+ * @param ms milliseconds
+ * @returns formatted string
+ */
+function formatMs2(ms: number) {
+  return `${ms.toFixed(2)} ms`;
+}
+
+export enum LogType {
+  FileSaved = 'file saved',
+  ActiveFileTextChanged = 'active file text changed',
+  ActiveFileChanged = 'active document changed',
+  FileDeleted = 'file deleted',
+  FileCreated = 'file created',
+  FileChanged = 'file changed',
+  SettingsChanged = 'settings changed',
+  GitBranchChanged = 'git branch changed',
+  FileParsed = 'file parsed',
+  FileMatched = 'matched parsed file',
+}
+
+export function logFileEvent(uri: Uri, event: LogType, extra?: string) {
   if (!isDevMode()) return;
   const fileInfo = getFileInfo(uri);
   logEvent(event, `on file ${fileInfo.name}.${fileInfo.type}${extra ? ` [${extra}]` : ''}`);
@@ -143,9 +165,27 @@ export function logFileEvent(uri: Uri, event: EventType, extra?: string) {
 
 export function logSettingsEvent(setting: Settings) {
   if (!isDevMode()) return;
-  logEvent(EventType.SettingsChanged, `setting ${setting} updated to ${getSettingValue(setting)}`);
+  logEvent(LogType.SettingsChanged, `setting ${setting} updated to ${getSettingValue(setting)}`);
 }
 
-export function logEvent(event: EventType, msg?: string) {
-  appendOutput([`[${new Date().toLocaleTimeString('en-US', { hour12: false })}] Event [${event}]${msg ? ' ' + msg : ''}`]);
+export function logFileParsed(startTime: number, parsedFile: Map<number, ParsedWord[]>, uri: Uri, lines: number, partial = false) {
+  if (!isDevMode()) return;
+  const fileInfo = getFileInfo(uri);
+  const msg = partial ? 'Partial reparse of file' : 'Parsed file';
+  log(`${msg} ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`);
+}
+
+export function logFileRebuild(startTime: number, uri: Uri, matches: MatchResult[]) {
+  if (!isDevMode()) return;
+  const fileInfo = getFileInfo(uri);
+  log(`Rebuilt file ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [matches: ${matches.length}]`);
+}
+
+export function logEvent(event: LogType, msg?: string) {
+  log(`Event [${event}]${msg ? ' ' + msg : ''}`, true);
+}
+
+function log(message: string, skipLine = false) {
+  const base = skipLine ? [''] : [];
+  appendOutput([...base, `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${message}`]);
 }

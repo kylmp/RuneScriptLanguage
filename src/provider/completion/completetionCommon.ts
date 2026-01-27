@@ -2,7 +2,7 @@ import type { Command, TextDocument } from "vscode";
 import { Position, CompletionItem, CompletionItemKind, Range, TextEdit } from "vscode";
 import { COMMAND, CONFIG_KEY, CONSTANT, ENUM, GLOBAL_VAR, LABEL, LOCAL_VAR, MESANIM, PROC, QUEUE, SKIP, TRIGGER } from "../../matching/matchType";
 import { getAllWithPrefix, getTypes } from "../../cache/completionCache";
-import { forceRebuild } from "../../core/eventHandlers";
+import { waitForActiveFileRebuild } from "../../core/eventHandlers";
 import { parseLineWithStateSnapshot } from "../../parsing/lineParser";
 import { singleWordMatch } from "../../matching/matchingEngine";
 import { runescriptTrigger } from "../../resource/triggers";
@@ -53,7 +53,7 @@ export function completionTypeSelector(position: Position): CompletionItem[] {
 let lastRequestId = 0;
 export async function searchForMatchType(document: TextDocument, position: Position, defaultMatchId = SKIP.id, fromTrigger = false): Promise<CompletionItem[]> {
   const requestId = ++lastRequestId;
-  await forceRebuild(document);
+  await waitForActiveFileRebuild(document);
   if (requestId !== lastRequestId) return []; // guard debounce, only continue with 1 result
   const triggerOffset = fromTrigger ? 2 : 0;
   let str = document.lineAt(position.line).text;

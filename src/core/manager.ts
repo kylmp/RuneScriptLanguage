@@ -1,4 +1,4 @@
-import type { TextDocument, TextDocumentContentChangeEvent, Uri, ExtensionContext } from "vscode";
+import type { Uri, ExtensionContext } from "vscode";
 import type { MatchResult, ParsedWord } from "../types";
 import { ProgressLocation, window, workspace } from "vscode";
 import { getActiveFile, getFileText, isActiveFile } from "../utils/fileUtils";
@@ -15,9 +15,7 @@ import { registerProviders } from "./providers";
 import { parseFile } from "../parsing/fileParser";
 import { monitoredFileTypes } from "../runescriptExtension";
 import { findFileExceptionWords } from "../parsing/wordExceptions";
-import { isDevMode, rebuildMetrics, registerDevMode, reportRebuildMetrics } from "./devMode";
-import { applyLineChanges, getAllWords } from "../parsing/lineParser";
-import { getLines } from "../utils/stringUtils";
+import { isDevMode, logFileRebuild, rebuildMetrics, registerDevMode, reportRebuildMetrics } from "./devMode";
 
 export function initializeExtension(context: ExtensionContext) {
   registerDiagnostics(context);
@@ -54,7 +52,8 @@ export function processAllFiles() {
  */
 let rebuildFileQueue = Promise.resolve();
 export function queueFileRebuild(uri: Uri, fileText: string[], parsedFile?: Map<number, ParsedWord[]>): Promise<void> {
-  rebuildFileQueue = rebuildFileQueue.then(() => rebuildFile(uri, fileText, parsedFile));
+  const parsed = parsedFile ?? parseFile(uri, fileText);
+  rebuildFileQueue = rebuildFileQueue.then(() => rebuildFile(uri, fileText, parsed));
   return rebuildFileQueue;
 }
 
@@ -82,7 +81,7 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
 
   // Parse the files into words with deeper parsing context
   startTime = performance.now();
-  files.forEach(file => file.parsedWords = new Map(parseFile(file.uri, file.lines)));
+  files.forEach(file => file.parsedWords = new Map(parseFile(file.uri, file.lines, true)));
   if (recordMetrics) rebuildMetrics.fileParsingDuration = performance.now() - startTime;
   
   // First pass => finds all the declarations & exception words so second pass will be complete
@@ -110,16 +109,17 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
  * @param uri Uri of the file getting rebuilt
  * @param lines Text of the file getting rebuilt
  */
-async function rebuildFile(uri: Uri, lines: string[], parsedFile?: Map<number, ParsedWord[]>): Promise<void> { 
-  const parsed = parsedFile ?? parseFile(uri, lines);
+async function rebuildFile(uri: Uri, lines: string[], parsedFile: Map<number, ParsedWord[]>, quiet = false): Promise<void> { 
+  const startTime = performance.now();
   clearFile(uri);
-  initActiveFilecache(uri, parsed);  
-  const fileMatches: MatchResult[] = matchFile(uri, parsed, lines, false);
+  initActiveFilecache(uri, parsedFile);  
+  const fileMatches: MatchResult[] = matchFile(uri, parsedFile, lines, false);
   await rebuildFileDiagnostics(uri, fileMatches);
   if (isActiveFile(uri)) {
     rebuildSemanticTokens();
     rebuildHighlights();
   }
+  if (!quiet) logFileRebuild(startTime, uri, fileMatches);
 }
 
 /**
@@ -127,27 +127,10 @@ async function rebuildFile(uri: Uri, lines: string[], parsedFile?: Map<number, P
  */
 async function rebuildActiveFile(): Promise<void> {
   const activeFile = getActiveFile();
-  if (activeFile) void queueFileRebuild(activeFile, await getFileText(activeFile));
-}
-
-/**
- * Rebuilds the active file based on the actual document changes, reparses only modified lines
- * up until the parser state is restored, avoiding a full file reparse.
- * Matches are still done for the whole parsed file.
- */
-export function rebuildFileChanges(document: TextDocument, changes: TextDocumentContentChangeEvent[]): number {
-  let linesReparsed = 0;
-  if (changes.length === 0) return linesReparsed;
-  for (const change of changes) {
-    const startLine = change.range.start.line;
-    const endLine = change.range.end.line;
-    const removedLines = endLine - startLine;
-    const addedLines = change.text.split(/\r?\n/).length - 1;
-    const lineDelta = addedLines - removedLines;
-    linesReparsed = applyLineChanges(document, startLine, endLine, lineDelta);
+  if (activeFile) {
+    const fileText = await getFileText(activeFile);
+    void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText, true));
   }
-  void queueFileRebuild(document.uri, getLines(document.getText()), getAllWords());
-  return linesReparsed;
 }
 
 /**
