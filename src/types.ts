@@ -1,6 +1,7 @@
 import type { Uri } from 'vscode';
 import type { HoverDisplayItem } from './enum/hoverDisplayItems';
 import type { SemanticTokenType } from './enum/semanticTokens';
+import type { ConfigVarArgSrc } from './resource/configKeys';
 
 /**
  * Definition of a parsed word
@@ -258,4 +259,21 @@ export interface ConfigLineData {
   key: string;
   params: string[];
   index: number;
+}
+
+/** Data which defines info about the values a config key expects (key=value(s)) */
+export interface ConfigKeyData {
+  /** The types of the params for this config key, in order */
+  params: string[],
+  /** Words to be ignored as params if they belong to this config key */
+  ignoreValues?: string[]
+  /** If this config key has var args, this data is used by the matcher to figure out the arg match types */
+  varArgs?: { 
+    /** The param index that the varags start on */
+    startIndex: number, 
+    /** The source of the identifier where the vararg param types are defined */
+    idenSrc: ConfigVarArgSrc, 
+    /** The match type id of the identifier where teh varag param types are defined */
+    idenType: string 
+  }
 }

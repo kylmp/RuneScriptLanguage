@@ -31,4 +31,4 @@ function parametersMatcherFn(context: MatchContext): void {
   }
 }
 
-export const parametersMatcher: Matcher = { priority: 9000, fn: parametersMatcherFn };
+export const parametersMatcher: Matcher = { priority: 12000, fn: parametersMatcherFn };

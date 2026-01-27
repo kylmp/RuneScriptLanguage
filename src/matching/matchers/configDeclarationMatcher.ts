@@ -27,4 +27,4 @@ function configDeclarationMatcherFn(context: MatchContext): void {
   }
 }
 
-export const configDeclarationMatcher: Matcher = { priority: 1500, fn: configDeclarationMatcherFn};
+export const configDeclarationMatcher: Matcher = { priority: 3000, fn: configDeclarationMatcherFn};

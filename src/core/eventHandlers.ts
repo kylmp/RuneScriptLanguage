@@ -9,8 +9,9 @@ import { getLines } from "../utils/stringUtils";
 import { clearFile, processAllFiles, queueFileRebuild, rebuildFileChanges } from "./manager";
 import { monitoredFileTypes } from "../runescriptExtension";
 
-// Debounce time only applies to active file text change events, everything else is done ASAP
-const debounceTimeMs = 200;
+
+const debounceTimeMs = 150; // debounce time for normal active file text changes
+const forceDebounceTimeMs = 75; // debounce time for force rebuilds (used by signature help and completion providers)
 
 export function registerEventHandlers(context: ExtensionContext): void {
   const patterns = Array.from(monitoredFileTypes, ext => `**/*.${ext}`);
@@ -36,6 +37,10 @@ export function registerEventHandlers(context: ExtensionContext): void {
 let pendingChanges: TextDocumentContentChangeEvent[] = [];
 let pendingDocument: TextDocument | undefined;
 let pendingTimer: NodeJS.Timeout | undefined;
+let forcePendingDocument: TextDocument | undefined;
+let forceTimer: NodeJS.Timeout | undefined;
+let forcePromise: Promise<void> | undefined;
+let forceResolve: (() => void) | undefined;
 function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void {
   if (!isActiveFile(textChangeEvent.document.uri)) return;
   if (!isValidFile(textChangeEvent.document.uri)) return;
@@ -54,12 +59,39 @@ function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void 
   }, debounceTimeMs);
 }
 
+/**
+ * Force rebuild a file and cancel any pending (partial) text doc change event debounce
+ * @param document document to force the rebuild on
+ * @returns a promise which resolves only when the document has finished being rebuilt
+ */
 export function forceRebuild(document: TextDocument): Promise<void> {
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingChanges = [];
   pendingTimer = undefined;
   pendingDocument = undefined;
-  return queueFileRebuild(document.uri, getLines(document.getText()));
+  forcePendingDocument = document;
+  if (forceTimer) clearTimeout(forceTimer);
+  if (!forcePromise) {
+    forcePromise = new Promise<void>((resolve) => {
+      forceResolve = resolve;
+    });
+  }
+  forceTimer = setTimeout(() => {
+    const doc = forcePendingDocument;
+    const resolve = forceResolve;
+    forcePendingDocument = undefined;
+    forceTimer = undefined;
+    forcePromise = undefined;
+    forceResolve = undefined;
+    if (!doc) {
+      resolve?.();
+      return;
+    }
+    void queueFileRebuild(doc.uri, getLines(doc.getText())).finally(() => {
+      resolve?.();
+    });
+  }, forceDebounceTimeMs);
+  return forcePromise;
 }
 
 async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<void> {

@@ -6,4 +6,4 @@ function constDeclarationMatcherFn(context: MatchContext): void {
   if (context.prevChar === '^' && context.file.type === "constant") declaration(CONSTANT, context);
 }
 
-export const constDeclarationMatcher: Matcher = { priority: 1750, fn: constDeclarationMatcherFn};
+export const constDeclarationMatcher: Matcher = { priority: 4000, fn: constDeclarationMatcherFn};

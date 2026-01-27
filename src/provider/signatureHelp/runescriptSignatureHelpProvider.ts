@@ -63,6 +63,8 @@ function getScriptTriggerHelp(document: TextDocument, position: Position): Signa
   }
 }
 
+let lastRequestId = 0;
+
 /**
  * Returns a signature help for the signature of the call function user is typing in (if any)
  * @param document document to find signature for
@@ -71,7 +73,9 @@ function getScriptTriggerHelp(document: TextDocument, position: Position): Signa
  */
 async function getParametersHelp(document: TextDocument, position: Position): Promise<SignatureHelp | undefined> {
   // We need the parser and active file cache states up to date
+  const requestId = ++lastRequestId;
   await forceRebuild(document);
+  if (requestId !== lastRequestId) return undefined; // guard debounce, only continue with 1 result
 
   // Get the callState at the position in the line of text to get the call info and param index
   const callState = getCallStateAtPosition(document.lineAt(position.line).text, position.line, document.uri, position.character);

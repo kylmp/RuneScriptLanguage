@@ -50,11 +50,14 @@ export function completionTypeSelector(position: Position): CompletionItem[] {
   });
 }
 
+let lastRequestId = 0;
 export async function searchForMatchType(document: TextDocument, position: Position, defaultMatchId = SKIP.id, fromTrigger = false): Promise<CompletionItem[]> {
+  const requestId = ++lastRequestId;
+  await forceRebuild(document);
+  if (requestId !== lastRequestId) return []; // guard debounce, only continue with 1 result
   const triggerOffset = fromTrigger ? 2 : 0;
   let str = document.lineAt(position.line).text;
   str = str.substring(0, position.character - triggerOffset) + 'temp' + str.substring(position.character);
-  await forceRebuild(document);
   const parsedWords = parseLineWithStateSnapshot(str, position.line, document.uri);
   const wordIndex = parsedWords.findIndex(w => w.start <= position.character && w.end >= position.character);
   const matchResult = singleWordMatch(document.uri, parsedWords, str, position.line, wordIndex);

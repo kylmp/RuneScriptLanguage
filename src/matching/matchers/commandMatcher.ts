@@ -21,4 +21,4 @@ const commandMatcherFn = (context: MatchContext): void => {
   }
 }
 
-export const commandMatcher: Matcher = { priority: 5000, fn: commandMatcherFn };
+export const commandMatcher: Matcher = { priority: 8000, fn: commandMatcherFn };

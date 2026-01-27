@@ -1,4 +1,4 @@
-import { type ConfigData, configKeys, ConfigVarArgSrc, getRegexKey, learnConfigKey } from "../../resource/configKeys";
+import { ConfigVarArgSrc, learnConfigKey, getConfigData } from "../../resource/configKeys";
 import type { MatchContext, Matcher, Identifier, ConfigLineData } from '../../types';
 import { CONFIG_KEY, SKIP, getMatchTypeById } from "../matchType";
 import { reference } from "../../utils/matchUtils";
@@ -27,36 +27,26 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
   // Get the configData from the configKeys static object [defined in configKeys.ts]
   const configKey = context.word.configKey;
   const paramIndex = context.word.paramIndex;
-  const configData: ConfigData = configKeys[configKey] ?? getRegexKey(configKey, context.file.type);
-  if (!configData) {
+  const configData = getConfigData(configKey, context.file.type);
+  if (!configData || (configData.ignoreValues ?? []).includes(context.word.value)) {
     reference(SKIP, context);
     return undefined;
   } 
-
-  // Exit early if explicity defined to ignore the word for this configData
-  if ((configData.ignoreValues ?? []).includes(context.word.value)) {
-    reference(SKIP, context);
-    return undefined;
-  }
 
   // If the configData has vararg params and the word index is on a vararg index, figure out the match type
   if (configData.varArgs && context.word.paramIndex >= configData.varArgs.startIndex) {
     // get varags source identifier
     let iden: Identifier | undefined;
-    let paramIndexOffset = 0;
     if (configData.varArgs.idenSrc === ConfigVarArgSrc.BlockName) {
       iden = getBlockScopeIdentifier(context.line.number);
     }
     else if (configData.varArgs.idenSrc === ConfigVarArgSrc.FirstParam) {
-      // todo I dont think this will work, as we need the resolved matchResult word for word modifications
-      const item = getByLineIndex(context.line.number, context.words[1].start);
-      iden = item?.identifier;
-      paramIndexOffset = -1;
+      iden = getByLineIndex(context.line.number, context.words[1].start)?.identifier;
     }
     // get the param match types from the identifier signature
-    const varArgIndex = paramIndex + paramIndexOffset;
+    const varArgIndex = paramIndex - configData.varArgs.startIndex;
     if (!iden?.signature?.params) return undefined;
-    const configLineData: ConfigLineData = { key: configKey, params: [...configData.params, ...iden.signature.params.map(p => p.type)], index: context.word.index - 1 };
+    const configLineData: ConfigLineData = { key: configKey, params: [...configData.params, ...iden.signature.params.map(p => p.type)], index: context.word.index };
     if (configData.varArgs.idenSrc === ConfigVarArgSrc.FirstParam) configLineData.params[0] = context.words[1].value;
     const varArgParam = iden.signature.params[varArgIndex];
     if (!varArgParam) return configLineData;
@@ -69,8 +59,8 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
     const paramType = configData.params[paramIndex];
     const resolvedMatchType = getMatchTypeById(dataTypeToMatchId(paramType)) ?? SKIP;
     reference(resolvedMatchType, context);
-    return { key: configKey, params: configData.params, index: context.word.index - 1 };
+    return { key: configKey, params: configData.params, index: context.word.index };
   }
 }
 
-export const configMatcher: Matcher = { priority: 7000, fn: configMatcherFn };
+export const configMatcher: Matcher = { priority: 10000, fn: configMatcherFn };

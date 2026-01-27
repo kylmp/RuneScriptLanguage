@@ -22,4 +22,4 @@ function matchLocalVarFn(context: MatchContext): void {
   }
 }
 
-export const matchLocalVar: Matcher = { priority: 2500, fn: matchLocalVarFn };
+export const matchLocalVar: Matcher = { priority: 6000, fn: matchLocalVarFn };

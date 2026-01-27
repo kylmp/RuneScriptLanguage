@@ -72,6 +72,7 @@ export const rowPostProcessor: PostProcessor = function(identifier) {
   }
 };
 
+const columnIgnoreTypes = new Set(['LIST','INDEXED','REQUIRED']);
 export const columnPostProcessor: PostProcessor = function(identifier) {
   const split = identifier.name.split(':');
   identifier.info = `A column of the <b>${split[0]}</b> table`;
@@ -80,7 +81,7 @@ export const columnPostProcessor: PostProcessor = function(identifier) {
   if (!identifier.block) return;
   const exec = END_OF_LINE_REGEX.exec(identifier.block.code);
   if (!exec) return;
-  const types = identifier.block.code.substring(8 + identifier.name.length, exec.index).split(',');
+  const types = identifier.block.code.substring(8 + identifier.name.length, exec.index).split(',').map(t => t.trim()).filter(t => !columnIgnoreTypes.has(t));
   const params = types.map(type => ({type: type, name: '', matchTypeId: ''}));
   identifier.signature = { params: params, paramsText: '', returns: [], returnsText: ''};
   identifier.block.code = `Field types: ${types.join(', ')}`;

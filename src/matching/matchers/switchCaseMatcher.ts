@@ -15,4 +15,4 @@ function switchCaseMatcherFn(context: MatchContext): void {
   }
 }
 
-export const switchCaseMatcher: Matcher = { priority: 8000, fn: switchCaseMatcherFn };
+export const switchCaseMatcher: Matcher = { priority: 11000, fn: switchCaseMatcherFn };

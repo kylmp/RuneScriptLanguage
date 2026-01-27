@@ -9,4 +9,4 @@ function columnDeclarationMatcherFn(context: MatchContext): void {
   }
 }
 
-export const columnDeclarationMatcher: Matcher = { priority: 1250, fn: columnDeclarationMatcherFn};
+export const columnDeclarationMatcher: Matcher = { priority: 2000, fn: columnDeclarationMatcherFn};

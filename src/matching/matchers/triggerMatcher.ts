@@ -28,4 +28,4 @@ function triggerMatcherFn(context: MatchContext): void {
   }
 }
 
-export const triggerMatcher: Matcher = { priority: 6000, fn: triggerMatcherFn };
+export const triggerMatcher: Matcher = { priority: 9000, fn: triggerMatcherFn };

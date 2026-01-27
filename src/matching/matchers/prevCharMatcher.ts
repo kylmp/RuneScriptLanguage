@@ -31,4 +31,4 @@ function labelMatcher(context: MatchContext): void {
   reference(LABEL, context);
 }
 
-export const prevCharMatcher: Matcher = { priority: 3000, fn: prevCharMatcherFn };
+export const prevCharMatcher: Matcher = { priority: 7000, fn: prevCharMatcherFn };

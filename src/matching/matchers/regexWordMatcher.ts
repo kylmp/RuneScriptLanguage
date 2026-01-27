@@ -22,4 +22,4 @@ function regexWordMatcherFn(context: MatchContext): void {
   }
 }
 
-export const regexWordMatcher: Matcher = { priority: 2000, fn: regexWordMatcherFn };
+export const regexWordMatcher: Matcher = { priority: 5000, fn: regexWordMatcherFn };
