@@ -2,13 +2,14 @@ import type { MatchContext, Matcher } from '../../types';
 import { SKIP } from "../matchType";
 import { reference } from "../../utils/matchUtils";
 import { getSwitchStmtType } from '../../cache/activeFileCache';
+import { SWITCH_CASE_REGEX } from '../../enum/regex';
 
 /**
 * Looks for matches in case statements
 */
 function switchCaseMatcherFn(context: MatchContext): void {
-  if (context.file.type === 'rs2' && context.word.index > 0 && 
-    context.words[context.word.index - 1].value === 'case' && context.word.value !== 'default') {
+  if (context.word.index > 0 && SWITCH_CASE_REGEX.test(context.line.text) && context.lineIndex < context.line.text.indexOf(' :')) {
+    if (context.word.value === 'default') return reference(SKIP, context);
     const resolved = getSwitchStmtType(context.line.number, context.word.braceDepth);
     resolved ? reference(resolved, context) : reference(SKIP, context);
   }
