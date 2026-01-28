@@ -4,10 +4,10 @@ import { ProgressLocation, window, workspace } from "vscode";
 import { getActiveFile, getFileText, isActiveFile } from "../utils/fileUtils";
 import { matchFile } from "../matching/matchingEngine";
 import { clear as clearActiveFileCache, init as initActiveFilecache } from "../cache/activeFileCache";
-import { clearAllDiagnostics, clearFileDiagnostics, rebuildFileDiagnostics, registerDiagnostics } from "./diagnostics";
+import { clearAllDiagnostics, clearFileDiagnostics, handleFileUpdate, rebuildFileDiagnostics, registerDiagnostics } from "./diagnostics";
 import { rebuildSemanticTokens } from "../provider/semanticTokensProvider";
 import { rebuildHighlights } from "./highlights";
-import { clearFile as clearIdentifierFile, clear as clearIdentifierCache } from '../cache/identifierCache';
+import { clearFile as clearIdentifierFile, clear as clearIdentifierCache, getFileIdentifiers } from '../cache/identifierCache';
 import { clear as clearProjectFilesCache, rebuild as rebuildProjectFilesCache } from '../cache/projectFilesCache';
 import { registerCommands } from "./commands";
 import { registerEventHandlers } from "./eventHandlers";
@@ -111,10 +111,12 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
  */
 async function rebuildFile(uri: Uri, lines: string[], parsedFile: Map<number, ParsedWord[]>, quiet = false): Promise<void> { 
   const startTime = performance.now();
+  const startIdentifiers = getFileIdentifiers(uri);
   clearFile(uri);
   initActiveFilecache(uri, parsedFile);  
   const fileMatches: MatchResult[] = matchFile(uri, parsedFile, lines, false);
   await rebuildFileDiagnostics(uri, fileMatches);
+  handleFileUpdate(startIdentifiers, getFileIdentifiers(uri));
   if (isActiveFile(uri)) {
     rebuildSemanticTokens();
     rebuildHighlights();

@@ -3,13 +3,14 @@ import { dataTypeToMatchId } from './dataTypeToMatchId';
 import { getBlockSkipLines, getConfigInclusions, getHoverLanguage, resolveAllHoverItems } from './hoverConfigResolver';
 import { SIGNATURE, CODEBLOCK } from '../enum/hoverDisplayItems';
 import { END_OF_BLOCK_LINE_REGEX, INFO_MATCHER_REGEX } from '../enum/regex';
-import { encodeReference } from '../utils/cacheUtils';
+import { encodeReference, resolveIdentifierKey } from '../utils/cacheUtils';
 
 export function buildFromDeclaration(name: string, context: MatchContext, text?: IdentifierText): Identifier {
   const identifier: Identifier = {
     name: name,
     matchId: context.matchType.id,
-    declaration: { uri: context.uri, ref: encodeReference(context.line.number, context.word.start) },
+    cacheKey: resolveIdentifierKey(context.word.value, context.matchType),
+    declaration: { uri: context.uri, ref: encodeReference(context.line.number, context.word.start, context.word.end) },
     references: {},
     fileType: context.uri.fsPath.split(/[#?]/)[0].split('.').pop()!.trim(),
     language: getHoverLanguage(context.matchType)
@@ -22,6 +23,7 @@ export function buildFromReference(name: string, context: MatchContext): Identif
   const identifier: Identifier = {
     name: name,
     matchId: context.matchType.id,
+    cacheKey: resolveIdentifierKey(context.word.value, context.matchType),
     references: {},
     fileType: (context.matchType.fileTypes || [])[0] || 'rs2',
     language: getHoverLanguage(context.matchType),
@@ -32,9 +34,9 @@ export function buildFromReference(name: string, context: MatchContext): Identif
   return identifier;
 }
 
-export function addReference(identifier: Identifier, fileKey: string, lineNum: number, index: number, context?: MatchContext): Set<string> {
+export function addReference(identifier: Identifier, fileKey: string, lineNum: number, startIndex: number, endIndex: number, context?: MatchContext): Set<string> {
   const fileReferences = identifier.references[fileKey] || new Set<string>();
-  fileReferences.add(encodeReference(lineNum, index));
+  fileReferences.add(encodeReference(lineNum, startIndex, endIndex));
   if (context && context.packId) identifier.id = context.packId;
   return fileReferences;
 }

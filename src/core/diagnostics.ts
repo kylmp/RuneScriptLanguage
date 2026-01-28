@@ -1,13 +1,22 @@
-import type { DiagnosticCollection, ExtensionContext, Uri } from 'vscode';
-import type { Identifier, MatchResult } from '../types';
-import { Diagnostic } from 'vscode';
-import { DiagnosticSeverity, languages, Range } from 'vscode';
-import { get as getIdentifierFromCache } from '../cache/identifierCache';
-import { fileNamePostProcessor } from '../resource/postProcessors';
-import { exists as projectFileExists } from '../cache/projectFilesCache';
+import type { DiagnosticCollection, ExtensionContext, Diagnostic } from 'vscode';
+import type { FileIdentifiers, IdentifierKey, MatchResult } from '../types';
+import type { RunescriptDiagnostic } from '../diagnostics/RunescriptDiagnostic';
+import { languages, Range, Uri } from 'vscode';
 import { getSettingValue, Settings } from './settings';
+import { UnknownIdentifierDiagnostic } from '../diagnostics/unknownIdentifierDiagnostic';
+import { UnknownFileDiagnostic } from '../diagnostics/unknownFileDiagnostic';
+import { getByKey } from '../cache/identifierCache';
+import { decodeReferenceToRange } from '../utils/cacheUtils';
 
 let diagnostics: DiagnosticCollection | undefined;
+
+const unknownIdenDiagnostic = new UnknownIdentifierDiagnostic();
+const unknownFileDiagnostic = new UnknownFileDiagnostic();
+
+const runescriptDiagnostics: RunescriptDiagnostic[] = [
+  unknownIdenDiagnostic,
+  unknownFileDiagnostic
+]
 
 export function registerDiagnostics(context: ExtensionContext): void {
   diagnostics = languages.createDiagnosticCollection('runescript-extension-diagnostics');
@@ -17,14 +26,21 @@ export function registerDiagnostics(context: ExtensionContext): void {
 function disposeDiagnostics(): void {
   diagnostics?.dispose();
   diagnostics = undefined;
+  runescriptDiagnostics.forEach(d => d.clearAll());
 }
 
 export function clearAllDiagnostics(): void {
   diagnostics?.clear();
+  runescriptDiagnostics.forEach(d => d.clearAll());
 }
 
 export function clearFileDiagnostics(uri: Uri): void {
   diagnostics?.delete(uri);
+  runescriptDiagnostics.forEach(d => d.clearFile(uri));
+}
+
+export function getFileDiagnostics(uri: Uri): readonly Diagnostic[] {
+  return diagnostics?.get(uri) || [];
 }
 
 export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult[]): Promise<void> {
@@ -36,52 +52,74 @@ export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult
       continue;
     }
 
-    // Build the range for the diagnostic, if needed
+    // Build the range for the diagnostic
     const { line: { number: lineNum }, word: { start, end } } = result.context;
-    const range = buildRange(lineNum, start, end);
+    const range = new Range(lineNum, start, lineNum, end + 1);
 
-    // Check for matches that reference an actual file, and make sure the file exists
-    if (result.context.matchType.postProcessor === fileNamePostProcessor) {
-      const fileName = `${result.word}.${(result.context.matchType.fileTypes || [])[0] ?? 'rs2'}`;
-      if (!projectFileExists(fileName)) {
-        diagnosticsList.push(buildFileNotFoundDiagnostic(range, fileName));
+    // Check all match result against all diagnostics, add if detected
+    runescriptDiagnostics.forEach(diag => {
+      if (diag.check(result)) {
+        const newDiagnostic = diag.createDiagnostic(range, result);
+        newDiagnostic.source = 'runescript';
+        diagnosticsList.push(newDiagnostic);
       }
-    }
-
-    // Below this point the identifier itself is needed
-    const identifier: Identifier | undefined = getIdentifierFromCache(result.word, result.context.matchType);
-    if (!identifier) {
-      continue;
-    }
-
-    // Check for unknown identifiers that are trying to be used
-    else if (!result.context.matchType.referenceOnly && !result.context.declaration && !identifier.declaration) {
-      diagnosticsList.push(buildUnknownItemDiagnostic(range, result.context.matchType.id, result.word));
-    }
+    });
   }
   diagnostics.set(uri, diagnosticsList);
 }
 
-export function getFileDiagnostics(uri: Uri): readonly Diagnostic[] {
-  return diagnostics?.get(uri) || [];
+export function handleFileUpdate(before?: FileIdentifiers, after?: FileIdentifiers): void {
+  if (!diagnostics) return;
+  const beforeDecs = before?.declarations ?? new Set<IdentifierKey>();
+  const afterDecs = after?.declarations ?? new Set<IdentifierKey>();
+  const addedDeclarations: IdentifierKey[] = [];
+  const removedDeclarations: IdentifierKey[] = [];
+
+  for (const key of beforeDecs) {
+    if (!afterDecs.has(key)) {
+      removedDeclarations.push(key);
+    }
+  }
+  for (const key of afterDecs) {
+    if (!beforeDecs.has(key)) {
+      addedDeclarations.push(key);
+    }
+  }
+
+  // New declaration added: clear any cached "unknown identifier" diagnostics for this identifier key.
+  for (const key of addedDeclarations) {
+    const cleared = unknownIdenDiagnostic.clearUnknowns(key);
+    if (!cleared) continue;
+    for (const [fileKey, ranges] of cleared) {
+      removeDiagnostics(Uri.file(fileKey), ranges)
+    }
+  }
+
+  // Removed declarations: get the identifier, add "unknown identifier" diagnostic to every reference it has
+  for (const key of removedDeclarations) {
+    const iden = getByKey(key);
+    if (!iden) continue;
+    for (const [fsPath, locations] of Object.entries(iden.references)) {
+      const uri = Uri.file(fsPath);
+      const fileDiagnostics = [...(diagnostics.get(uri) ?? [])];
+      for (const location of locations) {
+        const range = decodeReferenceToRange(location);
+        if (!range) continue;
+        const exists = fileDiagnostics.some(d => d.range.isEqual(range));
+        if (!exists) {
+          fileDiagnostics.push(unknownIdenDiagnostic.createByRangeIden(range, iden, fsPath));
+        }
+      }
+      diagnostics.set(uri, fileDiagnostics);
+    }
+  }
 }
 
-function buildUnknownItemDiagnostic(range: Range, matchTypeId: string, word: string): Diagnostic {
-  return buildDiagnostic(range, `Unknown ${matchTypeId.toLowerCase()}: ${word}`);
+function removeDiagnostics(uri: Uri, ranges: Range[]): void {
+  if (!diagnostics) return;
+  const existing = diagnostics.get(uri) ?? [];
+  const filtered = existing.filter(diag =>
+    !ranges.some(r => r.isEqual(diag.range))
+  );
+  diagnostics.set(uri, filtered);
 }
-
-function buildFileNotFoundDiagnostic(range: Range, fileName: string): Diagnostic {
-  return buildDiagnostic(range, `Refers to file ${fileName}, but it doesn't exist`);
-}
-
-function buildDiagnostic(range: Range, message: string, severity = DiagnosticSeverity.Warning): Diagnostic {
-  const diagnostic = new Diagnostic(range, message, severity);
-  diagnostic.source = 'runescript';
-  return diagnostic;
-}
-
-function buildRange(lineNum: number, start: number, end: number): Range {
-  return new Range(lineNum, start, lineNum, end + 1);
-}
-
-

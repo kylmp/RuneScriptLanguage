@@ -43,11 +43,10 @@ export const renameProvider: RenameProvider = {
 function renameReferences(identifier: Identifier | undefined, oldName: string, newName: string): WorkspaceEdit {
   const renameWorkspaceEdits = new WorkspaceEdit();
   if (identifier?.references) {
-    const wordLength = oldName.length - oldName.indexOf(':') - 1;
     Object.keys(identifier.references).forEach(fileKey => {
       const uri = Uri.file(fileKey);
       identifier.references[fileKey].forEach((encodedReference: string) => {
-        const range = decodeReferenceToRange(wordLength, encodedReference);
+        const range = decodeReferenceToRange(encodedReference);
         if (range) {
           renameWorkspaceEdits.replace(uri, range, newName);
         }

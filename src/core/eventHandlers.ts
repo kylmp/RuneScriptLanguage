@@ -1,6 +1,6 @@
 import type { ConfigurationChangeEvent, ExtensionContext, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextEditor, Uri } from "vscode";
 import { window, workspace } from "vscode";
-import { clearAllDiagnostics } from "./diagnostics";
+import { clearAllDiagnostics, handleFileUpdate } from "./diagnostics";
 import { getFileText, isActiveFile, isValidFile } from "../utils/fileUtils";
 import { addUris, removeUris } from "../cache/projectFilesCache";
 import { eventAffectsSetting, getSettingValue, Settings } from "./settings";
@@ -9,6 +9,7 @@ import { getLines } from "../utils/stringUtils";
 import { clearFile, processAllFiles, queueFileRebuild } from "./manager";
 import { monitoredFileTypes } from "../runescriptExtension";
 import { reparseFileWithChanges } from "../parsing/fileParser";
+import { getFileIdentifiers } from "../cache/identifierCache";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
@@ -97,6 +98,7 @@ async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<v
 function onDeleteFile(uri: Uri) {
   if (!isValidFile(uri)) return;
   logFileEvent(uri, LogType.FileDeleted, 'relevant cache entries invalidated');
+  handleFileUpdate(getFileIdentifiers(uri), undefined);
   clearFile(uri);
   removeUris([uri]);
 }

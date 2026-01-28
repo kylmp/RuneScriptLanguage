@@ -235,7 +235,7 @@ function cacheLocalVariable(matchResult: MatchResult): void {
     if (!localVarIden) return;
     const fileKey = resolveFileKey(matchResult.context.uri);
     if (!fileKey) return;
-    const refs = addReference(localVarIden, fileKey, lineNum, matchResult.context.word.start);
+    const refs = addReference(localVarIden, fileKey, lineNum, matchResult.context.word.start, matchResult.context.word.end);
     localVarIden.references[fileKey] = refs;
   }
 }
@@ -252,7 +252,7 @@ function createLocalVariableIdentifier(matchResult: MatchResult): Identifier | u
   if (matchResult.context.extraData!.param) code += ` (parameter)`;
   const text: IdentifierText = { lines: [code], start: 0 };
   const localVarIdentifier = buildFromDeclaration(matchResult.word, matchResult.context, text);
-  const refs = addReference(localVarIdentifier, fileKey, matchResult.context.line.number, matchResult.context.word.start);
+  const refs = addReference(localVarIdentifier, fileKey, matchResult.context.line.number, matchResult.context.word.start, matchResult.context.word.end);
   localVarIdentifier.references[fileKey] = refs;
   return localVarIdentifier;
 }

@@ -1,6 +1,6 @@
 const sizeof = require('object-sizeof');
 import type { Uri } from 'vscode';
-import type { FileKey, Identifier, IdentifierKey, IdentifierText, MatchContext, MatchType } from '../types';
+import type { FileIdentifiers, FileKey, Identifier, IdentifierKey, IdentifierText, MatchContext, MatchType } from '../types';
 import { addReference, buildFromDeclaration, buildFromReference, serializeIdentifier } from '../resource/identifierFactory';
 import { resolveFileKey, resolveIdentifierKey } from '../utils/cacheUtils';
 import { clear as clearCompletionCache, put as putCompletionCache, remove as removeCompletionCache } from './completionCache';
@@ -17,25 +17,6 @@ const identifierCache = new Map<IdentifierKey, Identifier>();
  * This is used to invalidate any identifiers within a file and reprocess the file when changes have been made
  */
 const fileToIdentifierMap = new Map<FileKey, FileIdentifiers>();
-
-/**
-  * Tracks the keys of identifier declarations and references within a file
-  */
-interface FileIdentifiers {
-  declarations: Set<IdentifierKey>;
-  references: Set<IdentifierKey>;
-}
-
-/**
- * Check if the identifierCache contains an item using the identifier name and match type
- * @param name Name of the identifier
- * @param match MatchType of the identifier
- * @returns boolean: true if found, false otherwise
- */
-function contains(name: string, match: MatchType): boolean {
-  const key = resolveIdentifierKey(name, match);
-  return key !== undefined && identifierCache.has(key);
-}
 
 /**
  * Get the cached identifier using the identifier name and match type
@@ -98,7 +79,7 @@ function put(name: string, context: MatchContext, text: IdentifierText): Identif
   putCompletionCache(name, context.matchType.id);
 
   // Also insert the declaration as a reference 
-  putReference(name, context, context.uri, context.line.number, context.word.start);
+  putReference(name, context, context.uri, context.line.number, context.word.start, context.word.end);
 
   // Return the created identifier
   return identifier;
@@ -110,10 +91,10 @@ function put(name: string, context: MatchContext, text: IdentifierText): Identif
  * @param context Context of the match this identifier was found in
  * @param uri file URI the reference is found in
  * @param lineNum line number within the file the reference is found on
- * @param index the index within the line where the reference is found
+ * @param startIndex the index within the line where the reference is found
  * @param packId the pack id, if any (ex: Obj id 1234)
  */
-function putReference(name: string, context: MatchContext, uri: Uri, lineNum: number, index: number): void {
+function putReference(name: string, context: MatchContext, uri: Uri, lineNum: number, startIndex: number, endIndex: number): void {
   // Make sure cache keys resolve correctly
   const key = resolveIdentifierKey(name, context.matchType);
   const fileKey = resolveFileKey(uri);
@@ -131,7 +112,7 @@ function putReference(name: string, context: MatchContext, uri: Uri, lineNum: nu
   // Get the current references for this identifier in the current file (if any) and add this new reference
   const curIdentifier = identifierCache.get(key);
   if (!curIdentifier) return;
-  const fileReferences = addReference(curIdentifier, fileKey, lineNum, index, context);
+  const fileReferences = addReference(curIdentifier, fileKey, lineNum, startIndex, endIndex, context);
 
   // Add the reference to the file map
   addToFileMap(fileKey, key, false);
@@ -257,4 +238,8 @@ function getTotalReferences(): number {
   return total;
 }
 
-export { contains, get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences };
+function getFileIdentifiers(uri: Uri): FileIdentifiers | undefined {
+  return fileToIdentifierMap.get(uri.fsPath);
+}
+
+export { get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences, getFileIdentifiers };

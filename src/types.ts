@@ -101,6 +101,8 @@ export interface Identifier {
   matchId: string;
   /** This is the pack id (such as Obj ID 1234), if it has one */
   id?: string;
+  /** The cache key for this identifier */
+  cacheKey: string;
   /** The location of the declaration/definition of the identifier, if it has one */
   declaration?: { uri: Uri; ref: string };
   /** The locations (encoded as string) of the references of the identifier */
@@ -143,6 +145,14 @@ export interface IdentifierText {
   lines: string[];
   /** The line number where this identifiers relevant code starts at */
   start: number;
+}
+
+/**
+  * Tracks the keys of identifier declarations and references within a file
+  */
+export interface FileIdentifiers {
+  declarations: Set<IdentifierKey>;
+  references: Set<IdentifierKey>;
 }
 
 /**

@@ -102,7 +102,7 @@ export function matchFile(uri: Uri, parsedFile: Map<number, ParsedWord[]>, lines
         } else {
           let index = match.context.word.start;
           if (!match.context.originalWord && match.word.indexOf(':') > 0) index += match.word.indexOf(':') + 1;
-          putReference(match.word, match.context, uri, lineNum, index);
+          putReference(match.word, match.context, uri, lineNum, index, match.context.word.end);
         }
       }
     }
