@@ -1,8 +1,11 @@
 export const COORD_REGEX = /(\d+_){4}\d+/;
 export const COLOR_REGEX = /\d{6}/;
+export const KEYWORD_REGEX = /\b(?:if|while|for|return|else|case)\b/;
+export const BOOLEAN_REGEX = /\b(?:true|false)\b/;
+export const TYPE_REGEX = /\b(?:def_)?(?:int|string|boolean|seq|locshape|component|idk|midi|npc_mode|namedobj|synth|stat|npc_stat|fontmetrics|enum|loc|model|npc|obj|player_uid|spotanim|npc_uid|inv|category|struct|dbrow|interface|dbtable|coord|mesanim|param|queue|weakqueue|timer|softtimer|char|dbcolumn|proc|label)\b/;
 export const ALPHA_NUMERIC = /^[a-z0-9]$/;
 export const RECOLOR_REGEX = /(recol[1-6][sd])=(\d+)/g;
-export const NUMBER_REGEX = /^\d+.?\d+$/;
+export const NUMBER_REGEX = /^(?:0x[0-9a-fA-F]+|\d+(?:\.\d+)?)$/;
 export const END_OF_BLOCK_REGEX = /(\r\n|\r|\n)(\[.+|val=.+|\^.+|\d+=.+)(?:$|(\r\n|\r|\n))/;
 export const END_OF_BLOCK_LINE_REGEX = /^(\[|\^|\d+=)/;
 export const START_OF_LINE_REGEX = /(?<=[\n])(?!.*[\n]).*/;

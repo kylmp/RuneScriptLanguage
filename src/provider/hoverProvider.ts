@@ -3,9 +3,9 @@ import type { Item } from '../types';
 import { Hover } from 'vscode';
 import { buildFromDeclaration } from '../resource/identifierFactory';
 import { getDeclarationHoverItems, getReferenceHoverItems } from '../resource/hoverConfigResolver';
-import { markdownBase, appendTitle, appendInfo, appendValue, appendSignature, appendCodeBlock, appendDebugHover } from '../utils/markdownUtils';
+import { markdownBase, appendTitle, appendInfo, appendValue, appendSignature, appendCodeBlock, appendDebugHover, appendOperatorHover } from '../utils/markdownUtils';
 import { getFileDiagnostics } from '../core/diagnostics';
-import { getByDocPosition, getParsedWordByDocPosition } from '../cache/activeFileCache';
+import { getByDocPosition, getOperatorByDocPosition, getParsedWordByDocPosition } from '../cache/activeFileCache';
 import { isDevMode } from '../core/devMode';
 import { getSettingValue, Settings } from '../core/settings';
 
@@ -14,7 +14,7 @@ export const hoverProvider = function(context: ExtensionContext): HoverProvider 
     async provideHover(document: TextDocument, position: Position): Promise<Hover | undefined> {
       if (!getSettingValue(Settings.ShowHover)) return undefined; // Exit early if hover disabled
       const markdown = markdownBase(context);
-      const item = await getByDocPosition(document, position);
+      const item = getByDocPosition(document, position);
       appendHover(markdown, document, position, item)
       await appendDebug(markdown, document, position, item);
       return new Hover(markdown);
@@ -23,7 +23,7 @@ export const hoverProvider = function(context: ExtensionContext): HoverProvider 
 }
 
 function getIdentifier(item: Item) {
-  return item.identifier ?? (item.context.matchType.hoverOnly ? buildFromDeclaration(item.word, item.context) : undefined);
+  return item.identifier ?? (!item.context.matchType.cache ? buildFromDeclaration(item.word, item.context) : undefined);
 }
 
 function appendHover(markdown: MarkdownString, document: TextDocument, position: Position, item: Item | undefined): void {
@@ -60,12 +60,10 @@ function appendHover(markdown: MarkdownString, document: TextDocument, position:
 
 async function appendDebug(markdown: MarkdownString, document: TextDocument, position: Position, item: Item | undefined): Promise<void> {
   if (isDevMode()) {
-    if (!item) {
-      const parsedWord = await getParsedWordByDocPosition(document, position);
-      if (!parsedWord) return;
-      appendDebugHover(markdown, parsedWord);
-    } else {
-      appendDebugHover(markdown, item.context.word, item.context, getIdentifier(item));
-    }
+    if (item) return appendDebugHover(markdown, item.context.word, item.context, getIdentifier(item));
+    const parsedWord = getParsedWordByDocPosition(position);
+    if (parsedWord) return appendDebugHover(markdown, parsedWord);
+    const operator = getOperatorByDocPosition(position);
+    if (operator) return appendOperatorHover(markdown, operator);
   }
 }

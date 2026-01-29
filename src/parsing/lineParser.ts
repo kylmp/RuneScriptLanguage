@@ -1,5 +1,5 @@
 import type { TextDocument, Uri } from 'vscode';
-import type { ParsedWord } from '../types';
+import type { OperatorToken, ParsedFile, ParsedWord } from '../types';
 import { resolveFileKey } from '../utils/cacheUtils';
 import { getFileInfo } from '../utils/fileUtils';
 import { matchLongestException } from './wordExceptions';
@@ -23,6 +23,7 @@ type ParserState = {
 
 type LineParseStateResult = {
   words: ParsedWord[];
+  operators: OperatorToken[];
   stringRanges: Range[];
   blockCommentRanges: Range[];
   nextState: ParserState;
@@ -31,6 +32,7 @@ type LineParseStateResult = {
 const stringRangesByLine = new Map<number, Range[]>();
 const blockCommentRangesByLine = new Map<number, Range[]>();
 const wordsByLine = new Map<number, ParsedWord[]>();
+const operatorsByLine = new Map<number, OperatorToken[]>();
 const endStateByLine = new Map<number, ParserState>();
 const state: ParserState = {
   fileKey: undefined,
@@ -83,6 +85,7 @@ export function resetLineParser(uri?: Uri): void {
   stringRangesByLine.clear();
   blockCommentRangesByLine.clear();
   wordsByLine.clear();
+  operatorsByLine.clear();
   endStateByLine.clear();
 }
 
@@ -104,6 +107,18 @@ export function getAllWords(): Map<number, ParsedWord[]> {
   return wordsByLine;
 }
 
+export function getParsedFile(): ParsedFile {
+  return { parsedWords: getAllWords(), operatorTokens: getAllOperators() };
+}
+
+export function getLineOperators(lineNum: number): OperatorToken[] {
+  return operatorsByLine.get(lineNum) ?? [];
+}
+
+export function getAllOperators(): Map<number, OperatorToken[]> {
+  return operatorsByLine;
+}
+
 export function getLineEndState(lineNum: number): ParserState | undefined {
   return endStateByLine.get(lineNum);
 }
@@ -118,11 +133,13 @@ export function applyLineChanges(document: TextDocument, startLine: number, endL
     shiftLineMap(wordsByLine, startLine, endLine, lineDelta);
     shiftLineMap(stringRangesByLine, startLine, endLine, lineDelta);
     shiftLineMap(blockCommentRangesByLine, startLine, endLine, lineDelta);
+    shiftLineMap(operatorsByLine, startLine, endLine, lineDelta);
     shiftLineMap(endStateByLine, startLine, endLine, lineDelta);
   } else {
     wordsByLine.delete(startLine);
     stringRangesByLine.delete(startLine);
     blockCommentRangesByLine.delete(startLine);
+    operatorsByLine.delete(startLine);
     endStateByLine.delete(startLine);
   }
 
@@ -177,6 +194,8 @@ export function parseLine(lineText: string, lineNum: number, uri: Uri): ParsedWo
   else blockCommentRangesByLine.delete(lineNum);
   if (result.words.length > 0) wordsByLine.set(lineNum, result.words);
   else wordsByLine.delete(lineNum);
+  if (result.operators.length > 0) operatorsByLine.set(lineNum, result.operators);
+  else operatorsByLine.delete(lineNum);
 
   return result.words;
 }
@@ -200,6 +219,8 @@ export function parseLineFromCache(lineText: string, lineNum: number, uri: Uri):
   else blockCommentRangesByLine.delete(lineNum);
   if (result.words.length > 0) wordsByLine.set(lineNum, result.words);
   else wordsByLine.delete(lineNum);
+  if (result.operators.length > 0) operatorsByLine.set(lineNum, result.operators);
+  else operatorsByLine.delete(lineNum);
   endStateByLine.set(lineNum, cloneParserState(result.nextState));
   return result.words;
 }
@@ -263,9 +284,10 @@ export function getCallStateAtPosition(lineText: string, lineNum: number, uri: U
 
 function parseLineWithState(lineText: string, _lineNum: number, startState: ParserState): LineParseStateResult {
   if (lineText.startsWith("text=") || lineText.startsWith("activetext=")) {
-    return { words: [], stringRanges: [], blockCommentRanges: [], nextState: cloneParserState(startState) };
+    return { words: [], operators: [], stringRanges: [], blockCommentRanges: [], nextState: cloneParserState(startState) };
   }
   const words: ParsedWord[] = [];
+  const operators: OperatorToken[] = [];
   const stringRanges: Range[] = [];
   const blockCommentRanges: Range[] = [];
   const nextState = cloneParserState(startState);
@@ -333,6 +355,9 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
   const isAlphaNum = (ch: string) => /[A-Za-z0-9_]/.test(ch);
   const canStartWord = (ch: string, next: string) =>
     isAlphaNum(ch) || (ch === '.' && isAlphaNum(next));
+  const addOperator = (op: string, index: number) => {
+    operators.push({ token: op, index, parenDepth });
+  };
 
   for (let i = 0; i < lineText.length; i++) {
     const ch = lineText[i]!;
@@ -415,6 +440,54 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
     if (ch === '}') {
       finalizeWord(i - 1);
       braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+
+    if (!startState.isConfig && (ch === '<' || ch === '>')) {
+      if (next === '=') {
+        finalizeWord(i - 1);
+        addOperator(ch + next, i);
+        i++;
+        continue;
+      }
+      finalizeWord(i - 1);
+      addOperator(ch, i);
+      continue;
+    }
+    if (!startState.isConfig && ch === '=') {
+      if (next === '=') {
+        i++;
+        continue;
+      }
+      finalizeWord(i - 1);
+      addOperator(ch, i);
+      continue;
+    }
+    if (!startState.isConfig && ch === '!') {
+      if (next === '=') {
+        i++;
+        continue;
+      }
+      finalizeWord(i - 1);
+      addOperator(ch, i);
+      continue;
+    }
+    if (!startState.isConfig && ch === '&') {
+      if (next === '&') {
+        i++;
+        continue;
+      }
+      finalizeWord(i - 1);
+      addOperator(ch, i);
+      continue;
+    }
+    if (!startState.isConfig && ch === '|') {
+      if (next === '|') {
+        i++;
+        continue;
+      }
+      finalizeWord(i - 1);
+      addOperator(ch, i);
       continue;
     }
 
@@ -532,7 +605,7 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
 
   nextState.parenDepth = parenDepth;
   nextState.braceDepth = braceDepth;
-  return { words, stringRanges, blockCommentRanges, nextState };
+  return { words, operators, stringRanges, blockCommentRanges, nextState };
 }
 
 function statesEqual(a: ParserState, b: ParserState): boolean {

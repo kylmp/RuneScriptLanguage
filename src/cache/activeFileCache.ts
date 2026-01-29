@@ -1,13 +1,14 @@
 import type { Position, TextDocument, Uri } from "vscode";
-import type { DataRange, Identifier, IdentifierText, Item, MatchResult, MatchType, ParsedWord } from "../types";
+import type { DataRange, Identifier, IdentifierText, Item, MatchResult, MatchType, OperatorToken, ParsedFile, ParsedWord } from "../types";
 import { get as getIdentifier } from "./identifierCache";
-import { LOCAL_VAR, QUEUE, SKIP, SWITCH, TRIGGER, UNKNOWN } from "../matching/matchType";
+import { LOCAL_VAR, QUEUE, SKIP, KEYWORD, TRIGGER, UNKNOWN } from "../matching/matchType";
 import { decodeReferenceToLocation, resolveFileKey, resolveKeyFromIdentifier } from "../utils/cacheUtils";
 import { addReference, buildFromDeclaration } from "../resource/identifierFactory";
 import { findMatchInRange } from "../utils/matchUtils";
 import { LineReferenceCache } from "./class/LineReferenceCache";
 import { CONFIG_DECLARATION_REGEX, QUEUE_REGEX } from "../enum/regex";
 import { dataTypeToMatchType } from "../resource/dataTypeToMatchId";
+import { isDevMode, logWarning } from "../core/devMode";
 
 /* A cache which holds info about the last processed file, typically the actively open file */
 
@@ -31,6 +32,12 @@ const fileMatches = new Map<number, DataRange<MatchResult>[]>();
  */
 let parsedWords: Map<number, ParsedWord[]> = new Map();
 
+/**
+ * File parsed operator tokens, keyed by line number
+ * The value is an array of parsed operator tokens on that line
+ */
+let operatorTokens: Map<number, OperatorToken[]> = new Map();
+
 // ===== GET DATA ===== //
 
 /**
@@ -39,7 +46,7 @@ let parsedWords: Map<number, ParsedWord[]> = new Map();
  * @param position The position (line num + index) to get the item for
  * @returns The item at that positon, if exists
  */
-export async function getByDocPosition(document: TextDocument, position: Position): Promise<Item | undefined> {
+export function getByDocPosition(document: TextDocument, position: Position): Item | undefined {
   return get(document.uri, position.line, position.character);
 }
 
@@ -50,8 +57,8 @@ export async function getByDocPosition(document: TextDocument, position: Positio
  * @param lineIndex The index within the line to find the match for
  * @returns The item on that line at that index, if exists
  */
-export function getByLineIndex(lineNum: number, lineIndex: number): Item | undefined {
-  return getNoAsync(lineNum, lineIndex);
+export function getByLineIndex(uri: Uri, lineNum: number, lineIndex: number): Item | undefined {
+  return get(uri, lineNum, lineIndex);
 }
 
 /**
@@ -60,10 +67,23 @@ export function getByLineIndex(lineNum: number, lineIndex: number): Item | undef
  * @param position The position (line num + index) to get the word for
  * @returns The word at that positon, if exists
  */
-export async function getParsedWordByDocPosition(document: TextDocument, position: Position): Promise<ParsedWord | undefined> {
+export function getParsedWordByDocPosition(position: Position): ParsedWord | undefined {
   const lineWords = parsedWords.get(position.line);
   if (lineWords) {
     return findMatchInRange(position.character, lineWords.map(word => ({start: word.start, end: word.end, data: word})))?.data;
+  }
+}
+
+/**
+ * Returns a parsed word at the given position in the given document, if it exists
+ * @param document The document to get word for
+ * @param position The position (line num + index) to get the word for
+ * @returns The word at that positon, if exists
+ */
+export function getOperatorByDocPosition(position: Position): OperatorToken | undefined {
+  const lineOperators = operatorTokens.get(position.line);
+  if (lineOperators) {
+    return findMatchInRange(position.character, lineOperators.map(operator => ({start: operator.index, end: operator.index + operator.token.length, data: operator})))?.data;
   }
 }
 
@@ -73,12 +93,12 @@ export async function getParsedWordByDocPosition(document: TextDocument, positio
  * @param callName The call function name we are looking for
  * @param callerIndex The index of the word of the call function name
  */
-export function getCallIdentifier(lineNum: number, callName: string, callNameIndex: number): Identifier | undefined {
+export function getCallIdentifier(uri: Uri, lineNum: number, callName: string, callNameIndex: number): Identifier | undefined {
   for (let curLine = lineNum; curLine >= Math.max(0, lineNum - 10); curLine--) {
     const lineParsedWords = parsedWords.get(curLine);
     const potentialCallWord = lineParsedWords?.[callNameIndex];
     if (potentialCallWord?.value === callName) {
-      const item = getNoAsync(curLine, potentialCallWord.start);
+      const item = get(uri, curLine, potentialCallWord.start);
       if (!item?.identifier || item.context.matchType.id === LOCAL_VAR.id) {
         if (QUEUE_REGEX.test(potentialCallWord.callName ?? '')) {
           const queueName = lineParsedWords?.[(potentialCallWord.callNameIndex ?? -2) + 1];
@@ -91,6 +111,14 @@ export function getCallIdentifier(lineNum: number, callName: string, callNameInd
   }
 }
 
+export function getLeftHandSide(): Item | undefined {
+  return undefined;
+}
+
+export function getRightHandSide(): Item | undefined {
+  return undefined;
+}
+
 /**
  * The core get item which does the searching of the caches to get an item on a line at that index
  * @param uri Used to validate the uri is the same as the one the cache is using
@@ -98,27 +126,10 @@ export function getCallIdentifier(lineNum: number, callName: string, callNameInd
  * @param index Position/Index the item is at within that line
  * @returns The item at that position, if it exists
  */
-async function get(uri: Uri, lineNum: number, index: number): Promise<Item | undefined> {
-  // In case we try to access cache data with the wrong file, it should be updated soon so poll until it matches (100ms max)
-  let tries = 0;
-  while (file !== uri.fsPath && tries < 20) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 5));
-    tries++;
-  }
+function get(uri: Uri, lineNum: number, index: number): Item | undefined {
   if (file !== uri.fsPath) {
-    return undefined; // File never matched even after 100ms, give up (something is wrong!)
+    return undefined; 
   }
-  return getNoAsync(lineNum, index);
-}
-
-/**
- * The core get item, bypassing the file name polling
- * @param lineNum Line number the item is on
- * @param index Position/Index the item is at within that line
- * @returns 
- */
-function getNoAsync(lineNum: number, index: number): Item | undefined {
-  // Get the item from the cache, if there is one on the line at that index, otherwise return early
   const result = findMatchInRange(index, fileMatches.get(lineNum))?.data;
   if (result) {
     return buildItem(result);
@@ -158,15 +169,23 @@ export function getAllParsedWords(): Map<number, ParsedWord[]> {
   return parsedWords;
 }
 
+/**
+ * Returns all of the matches and parsed words for the file
+ */
+export function getAllOperatorTokens(): Map<number, OperatorToken[]> {
+  return operatorTokens;
+}
+
 // ==== CACHE POPULATING FUNCTIONS ==== // 
 
 /**
  * Clears the cache and then initializes it for the new file
  * @param uri The uri of the file being built
  */
-export function init(uri: Uri, parsedFile: Map<number, ParsedWord[]>) {
+export function init(uri: Uri, parsedFile: ParsedFile) {
   fileMatches.clear();
-  parsedWords = parsedFile;
+  parsedWords = parsedFile.parsedWords;
+  operatorTokens = parsedFile.operatorTokens;
   localVarCache.clear();
   codeBlockCache.clear();
   switchStmtCache.clear();
@@ -180,6 +199,7 @@ export function init(uri: Uri, parsedFile: Map<number, ParsedWord[]>) {
 export function clear() {
   fileMatches.clear();
   parsedWords = new Map();
+  operatorTokens = new Map();
   localVarCache.clear();
   codeBlockCache.clear();
   switchStmtCache.clear();
@@ -202,6 +222,46 @@ export function processMatch(result: MatchResult): void {
   cacheLocalVariable(result);
   fileMatches.set(lineNum, lineItems);
 }
+
+/**
+ * Insert new matches into the active file cache, takes all matches for one line and inserts them in order
+ * @param results results to insert
+ */
+export function insertLineMatches(results: MatchResult[]): void {
+  if (results.length === 0) return;
+  const lineNum = results[0]!.context.line.number;
+  const lineResults = results.filter(r => r.context.line.number === lineNum);
+  if (isDevMode() && lineResults.length !== results.length) {
+    logWarning(`[activeFileCache] insertLineMatches expected all results to be on the same line, but got results spanning multiple lines`);
+  }
+  if (lineResults.length === 0) return;
+  const lineItems = fileMatches.get(lineNum) ?? [];
+  const additions = lineResults
+    .map(r => ({ start: r.context.word.start, end: r.context.word.end, data: r }))
+    .sort((a, b) => a.start - b.start);
+
+  if (lineItems.length === 0) {
+    fileMatches.set(lineNum, additions);
+    return;
+  }
+
+  // Merge sorted additions into the existing sorted lineItems.
+  const merged: typeof lineItems = [];
+  let i = 0;
+  let j = 0;
+  while (i < lineItems.length && j < additions.length) {
+    if (lineItems[i]!.start <= additions[j]!.start) {
+      merged.push(lineItems[i++]!);
+    } else {
+      merged.push(additions[j++]!);
+    }
+  }
+  while (i < lineItems.length) merged.push(lineItems[i++]!);
+  while (j < additions.length) merged.push(additions[j++]!);
+
+  fileMatches.set(lineNum, merged);
+}
+
 
 // ==== Local Variable Stuff ==== // 
 
@@ -347,7 +407,7 @@ export function getBlockScopeIdentifier(lineNum: number): Identifier | undefined
 const switchStmtCache: Map<number, LineReferenceCache<MatchType>> = new Map();
 
 export function cacheSwitchStmt(result: MatchResult): void {
-  if (result.context.matchType.id === SWITCH.id) {
+  if (result.context.matchType.id === KEYWORD.id && result.word.startsWith('switch_')) {
     const braceDepth = result.context.word.braceDepth + 1;
     const lineRef = switchStmtCache.get(braceDepth) || new LineReferenceCache<MatchType>();
     const type = dataTypeToMatchType(result.word.substring(7));

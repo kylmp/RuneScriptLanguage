@@ -8,7 +8,7 @@ import { clearDevModeOutput, initDevMode, logEvent, logFileEvent, logSettingsEve
 import { getLines } from "../utils/stringUtils";
 import { clearFile, processAllFiles, queueFileRebuild } from "./manager";
 import { monitoredFileTypes } from "../runescriptExtension";
-import { reparseFileWithChanges } from "../parsing/fileParser";
+import { parseFile, reparseFileWithChanges } from "../parsing/fileParser";
 import { getFileIdentifiers } from "../cache/identifierCache";
 
 
@@ -61,7 +61,7 @@ function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void 
     const changes = pendingChanges;
     pendingChanges = [];
     pendingTimer = undefined;
-    const parsedFile = reparseFileWithChanges(doc, changes);
+    const parsedFile = reparseFileWithChanges(doc, changes)!;
     void queueFileRebuild(doc.uri, getLines(doc.getText()), parsedFile).finally(() => {
       lastRebuildVersionByUri.set(doc.uri.fsPath, doc.version);
       for (let i = rebuildWaiters.length - 1; i >= 0; i--) {
@@ -118,18 +118,20 @@ function onChangeFile(uri: Uri) {
 }
 
 function onGitBranchChange() {
-  logEvent(LogType.GitBranchChanged, 'full cache rebuild');
+  logEvent(LogType.GitBranchChanged, () => 'full cache rebuild');
   processAllFiles();
 }
 
 async function updateFileFromUri(uri: Uri): Promise<void> {
   if (!isValidFile(uri)) return;
-  void queueFileRebuild(uri, await getFileText(uri));
+  const fileText = await getFileText(uri);
+  void queueFileRebuild(uri, fileText, parseFile(uri, fileText));
 }
 
 function updateFileFromDocument(document: TextDocument): void {
   if (!isValidFile(document.uri)) return;
-  void queueFileRebuild(document.uri, getLines(document.getText()));
+  const fileText = getLines(document.getText());
+  void queueFileRebuild(document.uri, fileText, parseFile(document.uri, fileText));
 }
 
 function onSettingsChange(event: ConfigurationChangeEvent) {

@@ -84,7 +84,7 @@ async function getParametersHelp(document: TextDocument, position: Position): Pr
   }
 
   // Retrieve the call identifier from the active file cache to access its signature
-  const identifier = getCallIdentifier(position.line, callState.callName, callState.callNameIndex);
+  const identifier = getCallIdentifier(document.uri, position.line, callState.callName, callState.callNameIndex);
   if (!identifier?.signature) {
     return undefined;
   }

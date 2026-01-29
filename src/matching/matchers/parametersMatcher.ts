@@ -23,7 +23,7 @@ function parametersMatcherFn(context: MatchContext): void {
     return undefined;
   }
 
-  const iden = getCallIdentifier(context.line.number, context.word.callName, context.word.callNameIndex);
+  const iden = getCallIdentifier(context.uri, context.line.number, context.word.callName, context.word.callNameIndex);
   if (iden?.signature && iden.signature.params.length > paramIndex) {
     const matchKey = iden.signature.params[paramIndex].matchTypeId;
     const resolvedMatchType = getMatchTypeById(matchKey) ?? SKIP;

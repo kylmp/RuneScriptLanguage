@@ -1,15 +1,20 @@
 import { Position, Range, type TextEditor } from 'vscode';
 import { DecorationRangeBehavior, window } from "vscode";
-import { getAllMatches, getAllParsedWords } from '../cache/activeFileCache';
+import { getAllMatches, getAllOperatorTokens, getAllParsedWords } from '../cache/activeFileCache';
 import { isDevMode } from './devMode';
 
 const matchDecoration = window.createTextEditorDecorationType({
-  backgroundColor: 'rgba(255, 200, 0, 0.25)',
+  backgroundColor: 'rgba(80, 200, 120, 0.20)',
   rangeBehavior: DecorationRangeBehavior.ClosedClosed
 });
 
 const wordDecoration = window.createTextEditorDecorationType({
   backgroundColor: 'rgba(255, 80, 80, 0.20)',
+  rangeBehavior: DecorationRangeBehavior.ClosedClosed
+});
+
+const operatorDecoration = window.createTextEditorDecorationType({
+  backgroundColor: 'rgba(160, 80, 255, 0.25)',
   rangeBehavior: DecorationRangeBehavior.ClosedClosed
 });
 
@@ -37,6 +42,7 @@ function buildHighlights(editor: TextEditor, mode = HighlightMode.AllWords) {
     case HighlightMode.AllWords:
       editor.setDecorations(matchDecoration, getMatchRanges());
       editor.setDecorations(wordDecoration, getWordRanges());
+      editor.setDecorations(operatorDecoration, getOperatorTokenRanges());
       break;
   }
 }
@@ -46,10 +52,18 @@ function getMatchRanges(): Range[] {
 }
 
 function getWordRanges(): Range[] {
-  const matches = getMatchRanges();
-  const words: Range[] = [];
+  const matchRanges = getMatchRanges();
+  const wordRanges: Range[] = [];
   getAllParsedWords().forEach((parsedLineWords, lineNum) => {
-    parsedLineWords.forEach(word => words.push(new Range(new Position(lineNum, word.start), new Position(lineNum, word.end + 1))));
+    parsedLineWords.forEach(word => wordRanges.push(new Range(new Position(lineNum, word.start), new Position(lineNum, word.end + 1))));
   });
-  return words.filter(range => !matches.some(match => match.intersection(range)));
+  return wordRanges.filter(range => !matchRanges.some(match => match.intersection(range)));
+}
+
+function getOperatorTokenRanges(): Range[] {
+  const operatorRanges: Range[] = [];
+  getAllOperatorTokens().forEach((operatorTokens, lineNum) => {
+    operatorTokens.forEach(operator => operatorRanges.push(new Range(new Position(lineNum, operator.index), new Position(lineNum, operator.index + operator.token.length))));
+  });
+  return operatorRanges;
 }

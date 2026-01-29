@@ -1,6 +1,6 @@
 import type { MatchContext, Matcher } from '../../types';
 import { get as getIdentifier } from "../../cache/identifierCache";
-import { COMMAND, SKIP } from "../matchType";
+import { COMMAND } from "../matchType";
 import { reference, declaration } from "../../utils/matchUtils";
 import { TRIGGER_LINE_REGEX } from "../../enum/regex";
 
@@ -12,7 +12,6 @@ const commandMatcherFn = (context: MatchContext): void => {
   if (command) {
     if (TRIGGER_LINE_REGEX.test(context.line.text)) {
       if (context.word.index === 1) return declaration(COMMAND, context);
-      else if (context.word.index > 1) return reference(SKIP, context);
     }
     if (command.signature && command.signature.params.length > 0 && context.nextChar !== '('){
       return undefined;

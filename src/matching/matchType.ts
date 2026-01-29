@@ -1,7 +1,8 @@
 import type { MatchType } from '../types';
-import { dataTypePostProcessor, enumPostProcessor, columnPostProcessor, rowPostProcessor, componentPostProcessor,
+import { globalVarPostProcessor, enumPostProcessor, columnPostProcessor, rowPostProcessor, componentPostProcessor,
   fileNamePostProcessor, coordPostProcessor, configKeyPostProcessor, triggerPostProcessor, categoryPostProcessor, 
-  paramPostProcessor} from '../resource/postProcessors';
+  paramPostProcessor,
+  localVarPostProcessor} from '../resource/postProcessors';
 import { CODEBLOCK, INFO, SIGNATURE, TITLE, VALUE } from "../enum/hoverDisplayItems";
 import { SemanticTokenType } from '../enum/semanticTokens';
 
@@ -15,12 +16,13 @@ function defineMatchType(match: MatchType): MatchType {
 export const LOCAL_VAR: MatchType = defineMatchType({
   id: 'LOCAL_VAR', types: [], fileTypes: ['rs2'], cache: false, allowRename: true,
   hoverConfig: { declarationItems: [TITLE, CODEBLOCK], referenceItems: [TITLE, CODEBLOCK], language: 'runescript', blockSkipLines: 0 },
+  postProcessor: localVarPostProcessor
 });
 
 export const GLOBAL_VAR: MatchType = defineMatchType({
   id: 'GLOBAL_VAR', types: ['var'], fileTypes: ['varp', 'varbit', 'vars', 'varn'], cache: true, allowRename: true,
   hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO, CODEBLOCK], language: 'varpconfig' },
-  postProcessor: dataTypePostProcessor
+  postProcessor: globalVarPostProcessor
 });
 
 export const CONSTANT: MatchType = defineMatchType({
@@ -175,64 +177,67 @@ export const STRUCT: MatchType = defineMatchType({
   hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO], language: 'structconfig' },
 });
 
+export const CATEGORY: MatchType = defineMatchType({
+  id: 'CATEGORY', types: ['category'], cache: true, allowRename: true, referenceOnly: true,
+  hoverConfig: { referenceItems: [TITLE, VALUE] },
+  postProcessor: categoryPostProcessor
+});
+
 // Hover only match types that are only used for displaying hover displays (no finding references/declarations)
 // Useful for terminating word searches early when detected. Postprocessing can be done on these.
 // Specify referenceConfig to select which displayItems should be shown on hover.
 export const COORDINATES: MatchType = defineMatchType({
-  id: 'COORDINATES', types: ['coord'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'COORDINATES', types: ['coord'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE, VALUE] },
   postProcessor: coordPostProcessor
 });
 
 export const CONFIG_KEY: MatchType = defineMatchType({
-  id: 'CONFIG_KEY', types: [], hoverOnly: true, cache: false, allowRename: false,
+  id: 'CONFIG_KEY', types: [], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE, INFO] },
   postProcessor: configKeyPostProcessor
 });
 
 export const TRIGGER: MatchType = defineMatchType({
-  id: 'TRIGGER', types: [], hoverOnly: true, cache: false, allowRename: false,
+  id: 'TRIGGER', types: [], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE, INFO] },
   postProcessor: triggerPostProcessor
 });
 
 export const STAT: MatchType = defineMatchType({
-  id: 'STAT', types: ['stat'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'STAT', types: ['stat'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE] },
 });
 
 export const NPC_STAT: MatchType = defineMatchType({
-  id: 'NPC_STAT', types: ['npc_stat'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'NPC_STAT', types: ['npc_stat'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE] },
 });
 
 export const NPC_MODE: MatchType = defineMatchType({
-  id: 'NPC_MODE', types: ['npc_mode'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'NPC_MODE', types: ['npc_mode'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE] },
 });
 
 export const LOCSHAPE: MatchType = defineMatchType({
-  id: 'LOCSHAPE', types: ['locshape'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'LOCSHAPE', types: ['locshape'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE] },
 });
 
 export const FONTMETRICS: MatchType = defineMatchType({
-  id: 'FONTMETRICS', types: ['fontmetrics'], hoverOnly: true, cache: false, allowRename: false,
+  id: 'FONTMETRICS', types: ['fontmetrics'], cache: false, allowRename: false,
   hoverConfig: { referenceItems: [TITLE] },
-});
-
-export const CATEGORY: MatchType = defineMatchType({
-  id: 'CATEGORY', types: ['category'], hoverOnly: true, cache: true, allowRename: true, referenceOnly: true,
-  hoverConfig: { referenceItems: [TITLE, VALUE] },
-  postProcessor: categoryPostProcessor
 });
 
 // NOOP Match types that might get detected, but nothing is done with them (no hover display, no finding references/declarations)
 // Useful for terminating word searching early when detected, and possibly doing something with them at a later date
 export const UNKNOWN: MatchType = defineMatchType({ id: 'UNKNOWN', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
 export const SKIP: MatchType = defineMatchType({ id: 'SKIP', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
-export const COLOR: MatchType = defineMatchType({ id: 'COLOR', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
-export const SWITCH: MatchType = defineMatchType({ id: 'SWITCH', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const NUMBER: MatchType = defineMatchType({ id: 'NUMBER', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const KEYWORD: MatchType = defineMatchType({ id: 'KEYWORD', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const TYPE: MatchType = defineMatchType({ id: 'TYPE', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const BOOLEAN: MatchType = defineMatchType({ id: 'BOOLEAN', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const NULL: MatchType = defineMatchType({ id: 'NULL', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
 
 function getMatchTypeById(id: string): MatchType | undefined {
   return matchTypesById.get(id);

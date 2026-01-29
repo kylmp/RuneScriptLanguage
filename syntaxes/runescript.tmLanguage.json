@@ -106,12 +106,7 @@
                 {
                     "comment": "Function parameters",
                     "name": "variable.language.runescript",
-                    "match": "\\b(coord\\)|queue|walktrigger|enum|softtimer|stat|int|string|boolean|seq|locshape|component|idk|midi|npc_mode|namedobj|synth|npc_stat|fontmetrics|loc|model|npc|obj|player_uid|spotanim|npc_uid|inv|category|struct|dbrow|interface|dbtable|mesanim|param|char|dbcolumn|proc|label|timer|idkit|hunt)\\b"
-                },
-                {
-                    "comment": "Function parameters (special case)",
-                    "name": "variable.language.runescript",
-                    "match": "\\bcoord "
+                    "match": "\\b(coord|queue|walktrigger|enum|softtimer|stat|int|string|boolean|seq|locshape|component|idk|midi|npc_mode|namedobj|synth|npc_stat|fontmetrics|loc|model|npc|obj|player_uid|spotanim|npc_uid|inv|category|struct|dbrow|interface|dbtable|mesanim|param|char|dbcolumn|proc|label|timer|idkit|hunt)\\b"
                 },
                 {
                     "comment": "Any other properties",

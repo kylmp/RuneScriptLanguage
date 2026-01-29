@@ -1,6 +1,6 @@
 import { type TextDocument, type TextDocumentContentChangeEvent, type Uri } from "vscode";
-import type { ParsedWord } from "../types";
-import { applyLineChanges, getAllWords, parseLine, resetLineParser } from "./lineParser";
+import type { ParsedFile } from "../types";
+import { applyLineChanges, getParsedFile, parseLine, resetLineParser } from "./lineParser";
 import { getFileText } from "../utils/fileUtils";
 import { logFileParsed } from "../core/devMode";
 
@@ -11,7 +11,7 @@ import { logFileParsed } from "../core/devMode";
  * @param fileText The text of the file to parse, if not provided it is read from the uri
  * @returns All of the parsed words for the file
  */
-export function parseFile(uri: Uri, fileText: string[], quiet = false): Map<number, ParsedWord[]> {
+export function parseFile(uri: Uri, fileText: string[], quiet = false): ParsedFile {
   const startTime = performance.now();
   const parsedWords = [];
   resetLineParser(uri);
@@ -19,9 +19,9 @@ export function parseFile(uri: Uri, fileText: string[], quiet = false): Map<numb
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
     parsedWords.push(...parseLine(lines[lineNum], lineNum, uri));
   }
-  const parsedFile = getAllWords();
-  if (!quiet) logFileParsed(startTime, parsedFile, uri, lines.length);
-  return parsedFile;
+  const parsedFile = getParsedFile();
+  if (!quiet) logFileParsed(startTime, uri, lines.length);
+  return { parsedWords: new Map(parsedFile.parsedWords), operatorTokens: new Map(parsedFile.operatorTokens) };
 }
 
 /**
@@ -29,7 +29,7 @@ export function parseFile(uri: Uri, fileText: string[], quiet = false): Map<numb
  * up until the parser state is restored, avoiding a full file reparse.
  * Matches are still done for the whole parsed file.
  */
-export function reparseFileWithChanges(document: TextDocument, changes: TextDocumentContentChangeEvent[], quiet = false): Map<number, ParsedWord[]> | undefined {
+export function reparseFileWithChanges(document: TextDocument, changes: TextDocumentContentChangeEvent[], quiet = false): ParsedFile | undefined {
   if (changes.length === 0) return undefined;
   const startTime = performance.now();
   let linesAffected = 0;
@@ -41,7 +41,7 @@ export function reparseFileWithChanges(document: TextDocument, changes: TextDocu
     const lineDelta = addedLines - removedLines;
     linesAffected = applyLineChanges(document, startLine, endLine, lineDelta);
   }
-  const parsedFile = getAllWords();
-  if (!quiet) logFileParsed(startTime, parsedFile, document.uri, linesAffected);
-  return parsedFile;
+  const parsedFile = getParsedFile();
+  if (!quiet) logFileParsed(startTime, document.uri, linesAffected);
+  return { parsedWords: new Map(parsedFile.parsedWords), operatorTokens: new Map(parsedFile.operatorTokens) };
 }

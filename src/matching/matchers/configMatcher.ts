@@ -41,7 +41,7 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
       iden = getBlockScopeIdentifier(context.line.number);
     }
     else if (configData.varArgs.idenSrc === ConfigVarArgSrc.FirstParam) {
-      iden = getByLineIndex(context.line.number, context.words[1].start)?.identifier;
+      iden = getByLineIndex(context.uri, context.line.number, context.words[1].start)?.identifier;
     }
     // get the param match types from the identifier signature
     const varArgIndex = paramIndex - configData.varArgs.startIndex;

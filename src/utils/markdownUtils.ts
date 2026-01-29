@@ -1,5 +1,5 @@
 import type { ExtensionContext } from 'vscode';
-import type { Identifier, MatchContext, ParsedWord } from '../types';
+import type { Identifier, MatchContext, OperatorToken, ParsedWord } from '../types';
 import { MarkdownString, Uri } from 'vscode';
 import { join, sep } from 'path';
 import { INFO, VALUE, SIGNATURE, CODEBLOCK } from '../enum/hoverDisplayItems';
@@ -55,65 +55,78 @@ export function appendBody(text: string, markdown: MarkdownString): void {
 }
 
 export function appendDebugHover(markdown: MarkdownString, word: ParsedWord, context?: MatchContext, identifier?: Identifier): void {
-  const debugLines: string[] = [];
-  debugLines.push(`matchType: ${context ? context.matchType.id : 'n/a'}`);
   if (markdown.value) markdown.appendMarkdown('\n\n---\n\n');
-  markdown.appendMarkdown(`**DEBUG ${word.value}**`);
-  markdown.appendCodeblock(debugLines.join('\n'), 'text');
+  if (!markdown.value) {
+    if (context) {
+      markdown.appendMarkdown(`**${context.matchType.id}** ${word.value}`);
+    } else {
+      markdown.appendMarkdown(`**UNMATCHED_TOKEN** ${word.value}`);
+    }
+  }
 
   const parsingInfoLines: string[] = [];
-  parsingInfoLines.push(`word: ${word.value}`);
-  parsingInfoLines.push(`wordIndex: ${word.index}`);
-  parsingInfoLines.push(`wordRange: ${word.start}-${word.end}`);
-  parsingInfoLines.push(`inInterpolation: ${word.inInterpolation}`);
-  parsingInfoLines.push(`parenthesisDepth: ${word.parenDepth}`);
-  parsingInfoLines.push(`braceDepth: ${word.braceDepth}`);
+  parsingInfoLines.push(`word=${word.value}`);
+  parsingInfoLines.push(`wordIndex=${word.index}`);
+  parsingInfoLines.push(`wordRange=${word.start}-${word.end}`);
+  parsingInfoLines.push(`inInterpolation=${word.inInterpolation}`);
+  parsingInfoLines.push(`parenthesisDepth=${word.parenDepth}`);
+  parsingInfoLines.push(`braceDepth=${word.braceDepth}`);
   if (context?.extraData && Object.keys(context.extraData).length > 0) {
-    parsingInfoLines.push(`extraData: ${JSON.stringify(context.extraData)}`);
+    parsingInfoLines.push(`extraData=${JSON.stringify(context.extraData)}`);
   }
   markdown.appendMarkdown(`\n\n---\n\n**Parsing Info**`);
-  markdown.appendCodeblock(parsingInfoLines.join('\n'), 'text');
+  markdown.appendCodeblock(parsingInfoLines.join('\n'), 'properties');
 
   if (word.callName || word.configKey) {
     const callInfoLines: string[] = [];
     if (word.callName) {
-      callInfoLines.push(`callName: ${word.callName}`);
-      callInfoLines.push(`callNameWordIndex: ${word.callNameIndex}`);
+      callInfoLines.push(`callName=${word.callName}`);
+      callInfoLines.push(`callNameWordIndex=${word.callNameIndex}`);
     }
     if (word.configKey) {
-      callInfoLines.push(`configKey: ${word.configKey}`);
-      callInfoLines.push(`configKeyWordIndex: ${word.callNameIndex}`);
+      callInfoLines.push(`configKey=${word.configKey}`);
+      callInfoLines.push(`configKeyWordIndex=${word.callNameIndex}`);
     }
-    callInfoLines.push(`paramIndex: ${word.paramIndex}`);
+    callInfoLines.push(`paramIndex=${word.paramIndex}`);
     markdown.appendMarkdown(`\n\n---\n\n**Parent Function**`);
-    markdown.appendCodeblock(callInfoLines.join('\n'), 'text');
+    markdown.appendCodeblock(callInfoLines.join('\n'), 'properties');
   }
 
   if (context?.originalWord) {
     const modifiedWordLines: string[] = [];
-    modifiedWordLines.push(`modifiedWord: true`);
-    modifiedWordLines.push(`originalWord: ${context.originalWord}`);
-    if (context.originalPrefix) modifiedWordLines.push(`originalPrefix: ${context.originalPrefix}`);
-    if (context.originalSuffix) modifiedWordLines.push(`originalSuffix: ${context.originalSuffix}`);
+    modifiedWordLines.push(`modifiedWord=true`);
+    modifiedWordLines.push(`originalWord=${context.originalWord}`);
+    if (context.originalPrefix) modifiedWordLines.push(`originalPrefix=${context.originalPrefix}`);
+    if (context.originalSuffix) modifiedWordLines.push(`originalSuffix=${context.originalSuffix}`);
     markdown.appendMarkdown(`\n\n---\n\n**Modified Word**`);
-    markdown.appendCodeblock(modifiedWordLines.join('\n'), 'text');
+    markdown.appendCodeblock(modifiedWordLines.join('\n'), 'properties');
   }
 
   if (identifier) {
     const identifierLines: string[] = [];
-    if (identifier.id) identifierLines.push(`packId: ${identifier.id}`);
-    identifierLines.push(`cacheId: ${word.value}${identifier.matchId}`);
+    if (identifier.id) identifierLines.push(`packId=${identifier.id}`);
+    identifierLines.push(context?.matchType.cache ? `cacheId=${word.value}${identifier.matchId}` : 'cacheId=Not cached');
     if (identifier.declaration) {
       const fileInfo = getFileInfo(identifier.declaration.uri);
       const location = decodeReferenceToLocation(identifier.declaration.uri, identifier.declaration.ref);
       const line = location ? location.range.start.line + 1 : 'n/a';
-      identifierLines.push(`declaration: ${fileInfo.name}.${fileInfo.type}, line ${line}`);
+      identifierLines.push(`declaration=${fileInfo.name}.${fileInfo.type}, line ${line}`);
     }
     const refCount = Object.values(identifier.references).reduce((count, set) => count + set.size, 0);
-    identifierLines.push(`references: ${refCount}`);
-    identifierLines.push(`language: ${identifier.language}`);
-    if (identifier.hideDisplay) identifierLines.push(`hideDisplay: true`);
+    identifierLines.push(`references=${refCount}`);
+    identifierLines.push(`language=${identifier.language}`);
+    if (identifier.comparisonType) identifierLines.push(`comparisonType=${identifier.comparisonType}`);
+    if (identifier.hideDisplay) identifierLines.push(`hideDisplay=true`);
     markdown.appendMarkdown(`\n\n---\n\n**Identifier**`);
-    markdown.appendCodeblock(identifierLines.join('\n'), 'text');
+    markdown.appendCodeblock(identifierLines.join('\n'), 'properties');
   }
+}
+
+export function appendOperatorHover(markdown: MarkdownString, operator: OperatorToken): void {
+  const operatorLines: string[] = [];
+  operatorLines.push(`index=${operator.index}`);
+  operatorLines.push(`parenDepth=${operator.parenDepth}`);
+  if (markdown.value) markdown.appendMarkdown('\n\n---\n\n');
+  markdown.appendMarkdown(`**OPERATOR** [ ${operator.token} ]`);
+  markdown.appendCodeblock(operatorLines.join('\n'), 'properties');
 }

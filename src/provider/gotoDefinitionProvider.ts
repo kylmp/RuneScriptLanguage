@@ -5,9 +5,9 @@ import { decodeReferenceToLocation } from '../utils/cacheUtils';
 
 export const gotoDefinitionProvider: DefinitionProvider = {
   async provideDefinition(document: TextDocument, position: Position): Promise<Location | undefined> {
-    // Get the item from the active document cache, exit early if noop or hoverOnly type
-    const item = await getByDocPosition(document, position);
-    if (!item || item.context.matchType.noop || item.context.matchType.hoverOnly) {
+    // Get the item from the active document cache, exit early if noop or non cached type
+    const item = getByDocPosition(document, position);
+    if (!item || item.context.matchType.noop || !item.context.matchType.cache) {
       return undefined;
     }
 

@@ -1,5 +1,5 @@
 import type { Uri, ExtensionContext } from "vscode";
-import type { MatchResult, ParsedWord } from "../types";
+import type { MatchResult, ParsedFile } from "../types";
 import { ProgressLocation, window, workspace } from "vscode";
 import { getActiveFile, getFileText, isActiveFile } from "../utils/fileUtils";
 import { matchFile } from "../matching/matchingEngine";
@@ -51,9 +51,8 @@ export function processAllFiles() {
  * Add a file to get rebuilt into the rebuild file queue
  */
 let rebuildFileQueue = Promise.resolve();
-export function queueFileRebuild(uri: Uri, fileText: string[], parsedFile?: Map<number, ParsedWord[]>): Promise<void> {
-  const parsed = parsedFile ?? parseFile(uri, fileText);
-  rebuildFileQueue = rebuildFileQueue.then(() => rebuildFile(uri, fileText, parsed));
+export function queueFileRebuild(uri: Uri, fileText: string[], parsedFile: ParsedFile, quiet = false): Promise<void> {
+  rebuildFileQueue = rebuildFileQueue.then(() => rebuildFile(uri, fileText, parsedFile, quiet));
   return rebuildFileQueue;
 }
 
@@ -70,7 +69,7 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
 
   // Read and parse all of the relevant project files
   let startTime = performance.now();
-  type File = { uri: Uri; lines: string[]; parsedWords?: Map<number, ParsedWord[]> };
+  type File = { uri: Uri; lines: string[]; parsedFile?: ParsedFile };
   const files: File[] = await Promise.all(uris.map(async uri => ({ uri: uri, lines: await getFileText(uri) })));
   if (recordMetrics) rebuildMetrics.fileReadDuration = performance.now() - startTime;
 
@@ -81,23 +80,23 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
 
   // Parse the files into words with deeper parsing context
   startTime = performance.now();
-  files.forEach(file => file.parsedWords = new Map(parseFile(file.uri, file.lines, true)));
+  files.forEach(file => file.parsedFile = parseFile(file.uri, file.lines, true));
   if (recordMetrics) rebuildMetrics.fileParsingDuration = performance.now() - startTime;
   
   // First pass => finds all the declarations & exception words so second pass will be complete
   startTime = performance.now();
   for (const file of files) {
-    initActiveFilecache(file.uri, file.parsedWords!);
-    matchFile(file.uri, file.parsedWords!, file.lines, true);
-    if (recordMetrics) rebuildMetrics.wordCount += [...file.parsedWords!.values()].reduce((sum, words) => sum + words.length, 0);
+    initActiveFilecache(file.uri, file.parsedFile!);
+    matchFile(file.uri, file.parsedFile!, file.lines, true);
+    if (recordMetrics) rebuildMetrics.wordCount += [...file.parsedFile!.parsedWords!.values()].reduce((sum, words) => sum + words.length, 0);
   }
   if (recordMetrics) rebuildMetrics.firstPassDuration = performance.now() - startTime;
 
   // Second pass => now that the declarations and exception words are known full matching can be done
   startTime = performance.now();
   for (const file of files) {
-    initActiveFilecache(file.uri, file.parsedWords!);
-    const matchResults = matchFile(file.uri, file.parsedWords!, file.lines, false);
+    initActiveFilecache(file.uri, file.parsedFile!);
+    const matchResults = matchFile(file.uri, file.parsedFile!, file.lines, false);
     await rebuildFileDiagnostics(file.uri, matchResults);
   }
   if (recordMetrics) rebuildMetrics.secondPassDuration = performance.now() - startTime;
@@ -109,7 +108,8 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
  * @param uri Uri of the file getting rebuilt
  * @param lines Text of the file getting rebuilt
  */
-async function rebuildFile(uri: Uri, lines: string[], parsedFile: Map<number, ParsedWord[]>, quiet = false): Promise<void> { 
+async function rebuildFile(uri: Uri, lines: string[], parsedFile: ParsedFile, quiet = false): Promise<void> { 
+  if (!parsedFile) return;
   const startTime = performance.now();
   const startIdentifiers = getFileIdentifiers(uri);
   clearFile(uri);
@@ -131,7 +131,7 @@ async function rebuildActiveFile(): Promise<void> {
   const activeFile = getActiveFile();
   if (activeFile) {
     const fileText = await getFileText(activeFile);
-    void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText, true));
+    void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText));
   }
 }
 

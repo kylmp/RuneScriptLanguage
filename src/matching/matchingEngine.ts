@@ -1,7 +1,7 @@
 import type { Uri } from 'vscode';
-import type { MatchContext, MatchResult, ParsedWord } from '../types';
-import { CATEGORY, COMPONENT, DBCOLUMN, DBROW, DBTABLE, MODEL, OBJ, SKIP, UNKNOWN } from './matchType';
-import { buildMatchContext } from '../utils/matchUtils';
+import type { MatchContext, MatchResult, ParsedFile, ParsedWord } from '../types';
+import { CATEGORY, COMPONENT, DBCOLUMN, DBROW, DBTABLE, MODEL, NULL, OBJ, SKIP, UNKNOWN } from './matchType';
+import { buildMatchContext, reference } from '../utils/matchUtils';
 import { LOC_MODEL_REGEX, TRIGGER_DEFINITION_REGEX } from '../enum/regex';
 import { packMatcher } from './matchers/packMatcher';
 import { regexWordMatcher } from './matchers/regexWordMatcher';
@@ -14,10 +14,12 @@ import { switchCaseMatcher } from './matchers/switchCaseMatcher';
 import { parametersMatcher } from './matchers/parametersMatcher';
 import { configDeclarationMatcher } from './matchers/configDeclarationMatcher';
 import { getFileInfo } from '../utils/fileUtils';
-import { getBlockScopeIdentifier, processMatch } from '../cache/activeFileCache';
+import { getBlockScopeIdentifier, processMatch as addToActiveFileCache } from '../cache/activeFileCache';
 import { columnDeclarationMatcher } from './matchers/columnDeclarationMatcher';
-import { put, putReference } from '../cache/identifierCache';
 import { constDeclarationMatcher } from './matchers/constMatcher';
+import { buildAndCacheIdentifier } from '../resource/identifierFactory';
+import { keywordTypeMatcher } from './matchers/keyWordTypeMatcher';
+import { booleanMatcher } from './matchers/booleanMatcher';
 
 export const enum Engine {
   Config = 'config',
@@ -54,6 +56,8 @@ const engines = {
       triggerMatcher,
       switchCaseMatcher,
       parametersMatcher,
+      keywordTypeMatcher,
+      booleanMatcher,
     ].slice().sort((a, b) => a.priority - b.priority),
   }
 } as const
@@ -67,12 +71,12 @@ const engines = {
  * @param engineOverride explicity define the matching engine to use (derived from file type if not provided)
  * @returns An array of all the matchResults in the file
  */
-export function matchFile(uri: Uri, parsedFile: Map<number, ParsedWord[]>, lines: string[], declarationsOnly = false, engineOverride?: Engine): MatchResult[] {
+export function matchFile(uri: Uri, parsedFile: ParsedFile, lines: string[], declarationsOnly = false, engineOverride?: Engine): MatchResult[] {
   const fileMatches: MatchResult[] = [];
   const fileInfo = getFileInfo(uri);
   const isRunescript = fileInfo.type === 'rs2';
   const engine = engineOverride ?? isRunescript ? Engine.Runescript : Engine.Config;
-  let parsedLines = Array.from(parsedFile, ([lineNum, parsedWords]) => ({ lineNum, parsedWords }));
+  let parsedLines = Array.from(parsedFile.parsedWords, ([lineNum, parsedWords]) => ({ lineNum, parsedWords }));
 
   // Process definition lines first if runescript file, because scripts can be refereneced ahead of their declaration
   if (isRunescript) {
@@ -89,22 +93,18 @@ export function matchFile(uri: Uri, parsedFile: Map<number, ParsedWord[]>, lines
   // Iterate thru each line 
   for (const { lineNum, parsedWords } of parsedLines) {
     const lineText = lines[lineNum];
-    // Iterate thru each word on the line
+    // Iterate thru each parsed word on the line to find its match type, if any
     for (let wordIndex = 0; wordIndex < parsedWords.length; wordIndex++) {
       const match = matchWord(buildMatchContext(uri, parsedWords, lineText, lineNum, wordIndex, fileInfo), engine, declarationsOnly);
-      if (match) {
-        processMatch(match);
-        fileMatches.push(match);
-        if (!match.context.matchType.cache) continue;
-        if (match.context.declaration) {
-          const startIndex = Math.max(lineNum - 1, 0);
-          put(match.word, match.context, { lines: lines.slice(startIndex), start: lineNum - startIndex });
-        } else {
-          let index = match.context.word.start;
-          if (!match.context.originalWord && match.word.indexOf(':') > 0) index += match.word.indexOf(':') + 1;
-          putReference(match.word, match.context, uri, lineNum, index, match.context.word.end);
-        }
-      }
+      if (!match) continue;
+      addToActiveFileCache(match);
+      fileMatches.push(match);
+      buildAndCacheIdentifier(match, uri, lineNum, lines);
+    }
+    // Operator matching is separately handled and occurs per line, using the now processed matchResults
+    if (isRunescript) {
+      // const lineOperators = parsedFile.operatorTokens.get(lineNum);
+      // operator matching
     }
   }
   return fileMatches;
@@ -136,8 +136,12 @@ export function singleWordMatch(uri: Uri, parsedLineWords: ParsedWord[], lineTex
  * @returns A matchResult if a match is made, undefined otherwise
  */
 function matchWord(context: MatchContext, engine: Engine, declarationsOnly = false): MatchResult | undefined {
-  if (!context.word || context.word.value === 'null') {
+  if (!context.word) {
     return undefined;
+  }
+  if (context.word.value === 'null') {
+    reference(NULL, context);
+    return response(context);
   }
   const matchers = declarationsOnly ? engines[engine].declarationMatchers : engines[engine].fullMatchers;
   for (const matcher of matchers) {

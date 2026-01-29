@@ -8,7 +8,7 @@ import { getByDocPosition } from '../cache/activeFileCache';
 export const renameProvider: RenameProvider = {
   async prepareRename(document: TextDocument, position: Position): Promise<Range | { range: Range; placeholder: string } | undefined> {
     // Get the item from the active document cache
-    const item = await getByDocPosition(document, position);
+    const item = getByDocPosition(document, position);
     if (!item) {
       throw new Error("Cannot rename");
     }
@@ -27,7 +27,7 @@ export const renameProvider: RenameProvider = {
 
   async provideRenameEdits(document: TextDocument, position: Position, newName: string): Promise<WorkspaceEdit | undefined> {
     // Get the item from the active document cache
-    const item = await getByDocPosition(document, position);
+    const item = getByDocPosition(document, position);
     if (!item) {
       return undefined;
     }

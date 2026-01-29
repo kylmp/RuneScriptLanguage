@@ -1,6 +1,6 @@
 import type { OutputChannel, Uri } from "vscode";
-import type { MatchResult, ParsedWord } from "../types";
-import { window } from "vscode";
+import type { MatchResult } from "../types";
+import { LogLevel, window } from "vscode";
 import { version as packageVersion } from '../../package.json';
 import { processAllFiles } from "./manager";
 import { getSettingValue, Settings } from "./settings";
@@ -123,7 +123,7 @@ export function reportRebuildMetrics(): void {
  * @returns formatted string
  */
 function formatToSec(ms: number) {
-  return `${(ms / 1000).toFixed(2)}s`;
+  return `${(ms / 1000).toFixed(2)} s`;
 }
 
 /**
@@ -158,34 +158,73 @@ export enum LogType {
 }
 
 export function logFileEvent(uri: Uri, event: LogType, extra?: string) {
-  if (!isDevMode()) return;
-  const fileInfo = getFileInfo(uri);
-  logEvent(event, `on file ${fileInfo.name}.${fileInfo.type}${extra ? ` [${extra}]` : ''}`);
+  const resolver = () => {
+    const fileInfo = getFileInfo(uri);
+    return `on file ${fileInfo.name}.${fileInfo.type}${extra ? ` [${extra}]` : ''}`;
+  }
+  logEvent(event, resolver);
 }
 
 export function logSettingsEvent(setting: Settings) {
-  if (!isDevMode()) return;
-  logEvent(LogType.SettingsChanged, `setting ${setting} updated to ${getSettingValue(setting)}`);
+  const resolver = () => `setting ${setting} updated to ${getSettingValue(setting)}`;
+  logEvent(LogType.SettingsChanged, resolver);
 }
 
-export function logFileParsed(startTime: number, parsedFile: Map<number, ParsedWord[]>, uri: Uri, lines: number, partial = false) {
-  if (!isDevMode()) return;
-  const fileInfo = getFileInfo(uri);
-  const msg = partial ? 'Partial reparse of file' : 'Parsed file';
-  log(`${msg} ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`);
+export function logEvent(event: LogType, msgResolver: () => string) {
+  const resolver = () => {
+    const msg = msgResolver();
+    return `Event [${event}]${msg ? ' ' + msg : ''}`
+  }
+  log(resolver, LogLevel.Info);
+}
+
+export function logFileParsed(startTime: number, uri: Uri, lines: number, partial = false) {
+  const resolver = () => {
+    const fileInfo = getFileInfo(uri);
+    const msg = partial ? 'Partial reparse of file' : 'Parsed file';
+    return `${msg} ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`;
+  }
+  log(resolver, LogLevel.Debug);
 }
 
 export function logFileRebuild(startTime: number, uri: Uri, matches: MatchResult[]) {
+  const resolver = () => {
+    const fileInfo = getFileInfo(uri);
+    return `Rebuilt file ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [matches: ${matches.length}]`;
+  }
+  log(resolver, LogLevel.Debug);
+}
+
+export function logDebug(message: string) {
+  log(() => message, LogLevel.Debug);
+}
+
+export function logInfo(message: string) {
+  log(() => message, LogLevel.Info);
+}
+
+export function logWarning(message: string) {
+  log(() => message, LogLevel.Warning);
+}
+
+export function logError(message: string) {
+  log(() => message, LogLevel.Warning);
+}
+
+function log(msgResolver: () => string, logLevel: LogLevel) {
   if (!isDevMode()) return;
-  const fileInfo = getFileInfo(uri);
-  log(`Rebuilt file ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [matches: ${matches.length}]`);
-}
-
-export function logEvent(event: LogType, msg?: string) {
-  log(`Event [${event}]${msg ? ' ' + msg : ''}`, true);
-}
-
-function log(message: string, skipLine = false) {
-  const base = skipLine ? [''] : [];
-  appendOutput([...base, `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${message}`]);
+  const msg = msgResolver();
+  if (!msg) return;
+  let level = '';
+  switch (logLevel) {
+    case LogLevel.Error: level = 'error'; break;
+    case LogLevel.Warning: level = 'warn '; break;
+    case LogLevel.Info: level = 'info '; break;
+    case LogLevel.Debug: level = 'debug'; break;
+  }
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false });
+  const ms = String(now.getMilliseconds()).padStart(3, '0');
+  const message = `[${time}.${ms}] ${level}: ${msg}`;
+  appendOutput([message]);
 }

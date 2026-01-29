@@ -1,9 +1,23 @@
-import type { Identifier, IdentifierText, MatchContext, MatchType } from '../types';
+import type { Identifier, IdentifierText, MatchContext, MatchResult, MatchType } from '../types';
+import type { Uri } from 'vscode';
 import { dataTypeToMatchId } from './dataTypeToMatchId';
 import { getBlockSkipLines, getConfigInclusions, getHoverLanguage, resolveAllHoverItems } from './hoverConfigResolver';
 import { SIGNATURE, CODEBLOCK } from '../enum/hoverDisplayItems';
 import { END_OF_BLOCK_LINE_REGEX, INFO_MATCHER_REGEX } from '../enum/regex';
 import { encodeReference, resolveIdentifierKey } from '../utils/cacheUtils';
+import { put as putIdentifier, putReference } from '../cache/identifierCache';
+
+export function buildAndCacheIdentifier(match: MatchResult, uri: Uri, lineNum: number, lines: string[]): void {
+  if (!match.context.matchType.cache) return;
+  if (match.context.declaration) {
+    const startIndex = Math.max(lineNum - 1, 0);
+    putIdentifier(match.word, match.context, { lines: lines.slice(startIndex), start: lineNum - startIndex });
+  } else {
+    let index = match.context.word.start;
+    if (!match.context.originalWord && match.word.indexOf(':') > 0) index += match.word.indexOf(':') + 1;
+    putReference(match.word, match.context, uri, lineNum, index, match.context.word.end);
+  }
+}
 
 export function buildFromDeclaration(name: string, context: MatchContext, text?: IdentifierText): Identifier {
   const identifier: Identifier = {
@@ -13,7 +27,7 @@ export function buildFromDeclaration(name: string, context: MatchContext, text?:
     declaration: { uri: context.uri, ref: encodeReference(context.line.number, context.word.start, context.word.end) },
     references: {},
     fileType: context.uri.fsPath.split(/[#?]/)[0].split('.').pop()!.trim(),
-    language: getHoverLanguage(context.matchType)
+    language: getHoverLanguage(context.matchType),
   };
   process(identifier, context, text);
   return identifier;
@@ -42,6 +56,9 @@ export function addReference(identifier: Identifier, fileKey: string, lineNum: n
 }
 
 function process(identifier: Identifier, context: MatchContext, text?: IdentifierText): void {
+  // Set the comparisonType for explicit comparison types from the match type 
+  if (context.matchType.comparisonType !== undefined) identifier.comparisonType = context.matchType.comparisonType;
+
   // Add extra data if any
   const extraData = context.extraData;
   if (extraData) {

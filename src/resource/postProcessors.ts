@@ -20,18 +20,25 @@ export const enumPostProcessor: PostProcessor = function(identifier) {
   const outputType = getLineText(block.code.substring(block.code.indexOf("outputtype="))).substring(11);
   const params = [{type: inputType, name: '', matchTypeId: ''}, {type: outputType, name: '', matchTypeId: ''}];
   identifier.signature = { params: params, paramsText: '', returns: [], returnsText: ''};
+  identifier.comparisonType = outputType;
 };
 
-export const dataTypePostProcessor: PostProcessor = function(identifier) {
+export const localVarPostProcessor: PostProcessor = function(identifier) {
+  identifier.comparisonType = identifier.extraData!.type;
+};
+
+export const globalVarPostProcessor: PostProcessor = function(identifier) {
   const index = identifier.block!.code.indexOf("type=");
   const dataType = (index < 0) ? 'int' : getLineText(identifier.block!.code.substring(index)).substring(5);
   identifier.extraData = { dataType: dataType };
+  identifier.comparisonType = dataType;
 };
 
 export const paramPostProcessor: PostProcessor = function(identifier) {
   const index = identifier.block!.code.indexOf("type=");
   const dataType = (index < 0) ? 'int' : getLineText(identifier.block!.code.substring(index)).substring(5);
   identifier.signature = { params: [{type: dataType, name: '', matchTypeId: ''}], paramsText: '', returns: [], returnsText: ''};
+  identifier.comparisonType = dataType;
 };
 
 export const configKeyPostProcessor: PostProcessor = function(identifier) {

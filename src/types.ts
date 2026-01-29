@@ -4,6 +4,16 @@ import type { SemanticTokenType } from './enum/semanticTokens';
 import type { ConfigVarArgSrc } from './resource/configKeys';
 
 /**
+ * Represents all of the parsed data from a file
+ */
+export interface ParsedFile {
+  /** All of the parsed words in the file, per line */
+  parsedWords: Map<number, ParsedWord[]>;
+  /** All of the operator tokens in the file, per line */
+  operatorTokens: Map<number, OperatorToken[]>;
+}
+
+/**
  * Definition of a parsed word
  */
 export interface ParsedWord {
@@ -31,6 +41,16 @@ export interface ParsedWord {
   paramIndex?: number;
   /** The config key name for config value words */
   configKey?: string;
+}
+
+/** Definition of a parsed operator token */
+export interface OperatorToken {
+  /** The operator text */
+  token: string;
+  /** The character index where the operator starts */
+  index: number;
+  /** The parenthesis depth at this operator */
+  parenDepth: number;
 }
 
 export interface FileInfo { name: string, type: string }
@@ -123,6 +143,8 @@ export interface Identifier {
   extraData?: Record<string, any>;
   /** Boolean indicating if hover text should not display for this identifier */
   hideDisplay?: boolean;
+  /** The type of value this identifier is or resolves to during comparison operations */
+  comparisonType?: string;
 }
 
 /**
@@ -177,12 +199,12 @@ export interface MatchType {
   allowRename: boolean;
   /** Whether or not identifiers declaration file name can be renamed (actual file rename) */
   renameFile?: boolean;
-  /** Whether or not identifiers of this type is for hover display only (not cached) */
-  hoverOnly?: boolean;
   /** Whether or not identifiers of this type is no operation (used for finding matches and terminating matching early, but not ever cached or displayed) */
   noop?: boolean;
   /** The config settings for the hover display of identifiers of this type */
   hoverConfig?: HoverConfig;
+  /** The comparison type that is *always* used for this matchType, if it has multiple possible comparison types such as constants, handle that in the identifier instead */
+  comparisonType?: string;
   /** Function that is executed after identifiers of this type have been created (allows for more dynamic runtime info with full context to be tied to an identifier) */
   postProcessor?: PostProcessor;
 }
