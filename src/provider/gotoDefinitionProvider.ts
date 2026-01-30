@@ -2,9 +2,15 @@ import type { DefinitionProvider, Position, TextDocument } from 'vscode';
 import { Location } from 'vscode';
 import { getByDocPosition } from '../cache/activeFileCache';
 import { decodeReferenceToLocation } from '../utils/cacheUtils';
+import type { Identifier } from '../types';
+import { getIdentifierAtPosition as getIdentifierAtMapPosition, isMapFile } from '../core/mapManager';
 
 export const gotoDefinitionProvider: DefinitionProvider = {
   async provideDefinition(document: TextDocument, position: Position): Promise<Location | undefined> {
+    if (isMapFile(document.uri)) {
+      return gotoIdentifier(getIdentifierAtMapPosition(position));
+    }
+
     // Get the item from the active document cache, exit early if noop or non cached type
     const item = getByDocPosition(document, position);
     if (!item || item.context.matchType.noop || !item.context.matchType.cache) {
@@ -18,7 +24,11 @@ export const gotoDefinitionProvider: DefinitionProvider = {
     }
 
     // Goto the declaration if the identifier exists
-    if (!item.identifier?.declaration) return undefined;
-    return decodeReferenceToLocation(item.identifier.declaration.uri, item.identifier.declaration.ref);
+    return gotoIdentifier(item.identifier);
   }
+}
+
+function gotoIdentifier(identifier: Identifier | undefined): Location | undefined {
+  if (!identifier?.declaration) return undefined;
+  return decodeReferenceToLocation(identifier.declaration.uri, identifier.declaration.ref);
 }

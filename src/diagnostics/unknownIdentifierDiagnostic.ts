@@ -6,7 +6,7 @@ import { getFullName, resolveIdentifierKey } from "../utils/cacheUtils";
 
 export class UnknownIdentifierDiagnostic extends RunescriptDiagnostic {
   /**
-   * Cache the diagnostics by identifierKey, value is a map keyed by URI anda. range of references in that URI
+   * Cache the diagnostics by identifierKey, value is a map keyed by URI and range of references in that URI
    */
   cache: Map<IdentifierKey, Map<string, Range[]>> = new Map();
 

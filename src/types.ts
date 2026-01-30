@@ -11,6 +11,15 @@ export interface ParsedFile {
   parsedWords: Map<number, ParsedWord[]>;
   /** All of the operator tokens in the file, per line */
   operatorTokens: Map<number, OperatorToken[]>;
+  /** All of the string ranges in the file, per line */
+  stringRanges: Map<number, TextRange[]>;
+  /** All of the interpolated code ranges in the file, per line */
+  interpolationRanges: Map<number, TextRange[]>;
+}
+
+export interface TextRange {
+  start: number;
+  end: number;
 }
 
 /**

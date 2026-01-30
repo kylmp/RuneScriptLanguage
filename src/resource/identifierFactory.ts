@@ -6,6 +6,7 @@ import { SIGNATURE, CODEBLOCK } from '../enum/hoverDisplayItems';
 import { END_OF_BLOCK_LINE_REGEX, INFO_MATCHER_REGEX } from '../enum/regex';
 import { encodeReference, resolveIdentifierKey } from '../utils/cacheUtils';
 import { put as putIdentifier, putReference } from '../cache/identifierCache';
+import { add as addToIdCache } from '../cache/idCache';
 
 export function buildAndCacheIdentifier(match: MatchResult, uri: Uri, lineNum: number, lines: string[]): void {
   if (!match.context.matchType.cache) return;
@@ -51,7 +52,10 @@ export function buildFromReference(name: string, context: MatchContext): Identif
 export function addReference(identifier: Identifier, fileKey: string, lineNum: number, startIndex: number, endIndex: number, context?: MatchContext): Set<string> {
   const fileReferences = identifier.references[fileKey] || new Set<string>();
   fileReferences.add(encodeReference(lineNum, startIndex, endIndex));
-  if (context && context.packId) identifier.id = context.packId;
+  if (context && context.packId) {
+    identifier.id = context.packId;
+    addToIdCache(dataTypeToMatchId(context.file.name), context.packId, context.word.value);
+  }
   return fileReferences;
 }
 

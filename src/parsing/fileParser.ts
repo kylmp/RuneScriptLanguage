@@ -19,9 +19,8 @@ export function parseFile(uri: Uri, fileText: string[], quiet = false): ParsedFi
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
     parsedWords.push(...parseLine(lines[lineNum], lineNum, uri));
   }
-  const parsedFile = getParsedFile();
   if (!quiet) logFileParsed(startTime, uri, lines.length);
-  return { parsedWords: new Map(parsedFile.parsedWords), operatorTokens: new Map(parsedFile.operatorTokens) };
+  return cloneParsedFile();
 }
 
 /**
@@ -41,7 +40,16 @@ export function reparseFileWithChanges(document: TextDocument, changes: TextDocu
     const lineDelta = addedLines - removedLines;
     linesAffected = applyLineChanges(document, startLine, endLine, lineDelta);
   }
-  const parsedFile = getParsedFile();
   if (!quiet) logFileParsed(startTime, document.uri, linesAffected);
-  return { parsedWords: new Map(parsedFile.parsedWords), operatorTokens: new Map(parsedFile.operatorTokens) };
+  return cloneParsedFile();;
+}
+
+function cloneParsedFile(): ParsedFile {
+  const parsedFile = getParsedFile();
+  return {
+    parsedWords: new Map(parsedFile.parsedWords),
+    operatorTokens: new Map(parsedFile.operatorTokens),
+    stringRanges: new Map(parsedFile.stringRanges),
+    interpolationRanges: new Map(parsedFile.interpolationRanges)
+  };
 }

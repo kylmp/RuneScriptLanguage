@@ -7,7 +7,22 @@ import { getSettingValue, Settings } from "./settings";
 import { appriximateSize, getCacheKeyCount, getTotalReferences } from "../cache/identifierCache";
 import { getTypesCount } from "../cache/completionCache";
 import { getExceptionWords } from "../parsing/wordExceptions";
-import { getFileInfo } from "../utils/fileUtils";
+import { getFileName } from "../utils/fileUtils";
+
+export enum Events {
+  FileSaved = 'file saved',
+  ActiveFileTextChanged = 'active file text changed',
+  ActiveFileChanged = 'active document changed',
+  FileDeleted = 'file deleted',
+  FileCreated = 'file created',
+  FileChanged = 'file changed',
+  SettingsChanged = 'settings changed',
+  GitBranchChanged = 'git branch changed',
+  FileParsed = 'file parsed',
+  FileMatched = 'matched parsed file',
+  MapFileOpened = 'map file opened',
+  MapFileEdited = 'map file edited'
+}
 
 interface initializationMetrics {
   fileCount: number,
@@ -144,33 +159,19 @@ function formatMs2(ms: number) {
   return `${ms.toFixed(2)} ms`;
 }
 
-export enum LogType {
-  FileSaved = 'file saved',
-  ActiveFileTextChanged = 'active file text changed',
-  ActiveFileChanged = 'active document changed',
-  FileDeleted = 'file deleted',
-  FileCreated = 'file created',
-  FileChanged = 'file changed',
-  SettingsChanged = 'settings changed',
-  GitBranchChanged = 'git branch changed',
-  FileParsed = 'file parsed',
-  FileMatched = 'matched parsed file',
-}
-
-export function logFileEvent(uri: Uri, event: LogType, extra?: string) {
+export function logFileEvent(uri: Uri, event: Events, extra?: string) {
   const resolver = () => {
-    const fileInfo = getFileInfo(uri);
-    return `on file ${fileInfo.name}.${fileInfo.type}${extra ? ` [${extra}]` : ''}`;
+    return `on file ${getFileName(uri)}${extra ? ` [${extra}]` : ''}`;
   }
   logEvent(event, resolver);
 }
 
 export function logSettingsEvent(setting: Settings) {
   const resolver = () => `setting ${setting} updated to ${getSettingValue(setting)}`;
-  logEvent(LogType.SettingsChanged, resolver);
+  logEvent(Events.SettingsChanged, resolver);
 }
 
-export function logEvent(event: LogType, msgResolver: () => string) {
+export function logEvent(event: Events, msgResolver: () => string) {
   const resolver = () => {
     const msg = msgResolver();
     return `Event [${event}]${msg ? ' ' + msg : ''}`
@@ -180,17 +181,23 @@ export function logEvent(event: LogType, msgResolver: () => string) {
 
 export function logFileParsed(startTime: number, uri: Uri, lines: number, partial = false) {
   const resolver = () => {
-    const fileInfo = getFileInfo(uri);
     const msg = partial ? 'Partial reparse of file' : 'Parsed file';
-    return `${msg} ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`;
+    return `${msg} ${getFileName(uri)} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`;
+  }
+  log(resolver, LogLevel.Debug);
+}
+
+export function logMapFileProcessed(startTime: number, uri: Uri, lines: number, partial = false) {
+  const resolver = () => {
+    const msg = partial ? 'Processed partial reparse of map file' : 'Processed full parse of map file';
+    return `${msg} ${getFileName(uri)} in ${formatMs2(performance.now() - startTime)} [lines parsed: ${lines}]`;
   }
   log(resolver, LogLevel.Debug);
 }
 
 export function logFileRebuild(startTime: number, uri: Uri, matches: MatchResult[]) {
   const resolver = () => {
-    const fileInfo = getFileInfo(uri);
-    return `Rebuilt file ${fileInfo.name}.${fileInfo.type} in ${formatMs2(performance.now() - startTime)} [matches: ${matches.length}]`;
+    return `Rebuilt file ${getFileName(uri)} in ${formatMs2(performance.now() - startTime)} [matches: ${matches.length}]`;
   }
   log(resolver, LogLevel.Debug);
 }

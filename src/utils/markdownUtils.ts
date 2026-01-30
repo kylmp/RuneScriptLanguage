@@ -1,10 +1,10 @@
 import type { ExtensionContext } from 'vscode';
-import type { Identifier, MatchContext, OperatorToken, ParsedWord } from '../types';
+import type { Identifier, MatchContext, OperatorToken, ParsedWord, TextRange } from '../types';
 import { MarkdownString, Uri } from 'vscode';
 import { join, sep } from 'path';
 import { INFO, VALUE, SIGNATURE, CODEBLOCK } from '../enum/hoverDisplayItems';
 import { GLOBAL_VAR } from '../matching/matchType';
-import { getFileInfo } from './fileUtils';
+import { getFileName } from './fileUtils';
 import { decodeReferenceToLocation } from './cacheUtils';
 
 export function markdownBase(extensionContext: ExtensionContext): MarkdownString {
@@ -107,10 +107,9 @@ export function appendDebugHover(markdown: MarkdownString, word: ParsedWord, con
     if (identifier.id) identifierLines.push(`packId=${identifier.id}`);
     identifierLines.push(context?.matchType.cache ? `cacheId=${word.value}${identifier.matchId}` : 'cacheId=Not cached');
     if (identifier.declaration) {
-      const fileInfo = getFileInfo(identifier.declaration.uri);
       const location = decodeReferenceToLocation(identifier.declaration.uri, identifier.declaration.ref);
       const line = location ? location.range.start.line + 1 : 'n/a';
-      identifierLines.push(`declaration=${fileInfo.name}.${fileInfo.type}, line ${line}`);
+      identifierLines.push(`declaration=${getFileName(identifier.declaration.uri)}, line ${line}`);
     }
     const refCount = Object.values(identifier.references).reduce((count, set) => count + set.size, 0);
     identifierLines.push(`references=${refCount}`);
@@ -129,4 +128,13 @@ export function appendOperatorHover(markdown: MarkdownString, operator: Operator
   if (markdown.value) markdown.appendMarkdown('\n\n---\n\n');
   markdown.appendMarkdown(`**OPERATOR** [ ${operator.token} ]`);
   markdown.appendCodeblock(operatorLines.join('\n'), 'properties');
+}
+
+export function appendStringHover(markdown: MarkdownString, range: TextRange): void {
+  const stringLines: string[] = [];
+  stringLines.push(`range=${range.start}-${range.end}`);
+  stringLines.push(`length=${Math.max(0, range.end - range.start + 1)}`);
+  if (markdown.value) markdown.appendMarkdown('\n\n---\n\n');
+  markdown.appendMarkdown(`**STRING**`);
+  markdown.appendCodeblock(stringLines.join('\n'), 'properties');
 }

@@ -1,22 +1,29 @@
 import type { ExtensionContext, HoverProvider, MarkdownString, Position, TextDocument } from 'vscode';
-import type { Item } from '../types';
+import type { Identifier, Item, MatchType } from '../types';
+import type { HoverDisplayItem } from '../enum/hoverDisplayItems';
 import { Hover } from 'vscode';
 import { buildFromDeclaration } from '../resource/identifierFactory';
 import { getDeclarationHoverItems, getReferenceHoverItems } from '../resource/hoverConfigResolver';
-import { markdownBase, appendTitle, appendInfo, appendValue, appendSignature, appendCodeBlock, appendDebugHover, appendOperatorHover } from '../utils/markdownUtils';
+import { markdownBase, appendTitle, appendInfo, appendValue, appendSignature, appendCodeBlock, appendDebugHover, appendOperatorHover, appendStringHover } from '../utils/markdownUtils';
 import { getFileDiagnostics } from '../core/diagnostics';
-import { getByDocPosition, getOperatorByDocPosition, getParsedWordByDocPosition } from '../cache/activeFileCache';
+import { getByDocPosition, getInterpolationRangeByDocPosition, getOperatorByDocPosition, getParsedWordByDocPosition, getStringRangeByDocPosition } from '../cache/activeFileCache';
 import { isDevMode } from '../core/devMode';
 import { getSettingValue, Settings } from '../core/settings';
+import { getIdentifierAtPosition as getMapIdentifierAtPosition, isMapFile } from '../core/mapManager';
+import { getMatchTypeById } from '../matching/matchType';
 
 export const hoverProvider = function(context: ExtensionContext): HoverProvider {
   return {
     async provideHover(document: TextDocument, position: Position): Promise<Hover | undefined> {
       if (!getSettingValue(Settings.ShowHover)) return undefined; // Exit early if hover disabled
       const markdown = markdownBase(context);
-      const item = getByDocPosition(document, position);
-      appendHover(markdown, document, position, item)
-      await appendDebug(markdown, document, position, item);
+      if (isMapFile(document.uri)) {
+        appendMapHover(markdown, position);
+      } else {
+        const item = getByDocPosition(document, position);
+        appendHover(markdown, document, position, item);
+        await appendDebug(markdown, document, position, item);
+      }
       return new Hover(markdown);
     }
   };
@@ -24,6 +31,16 @@ export const hoverProvider = function(context: ExtensionContext): HoverProvider 
 
 function getIdentifier(item: Item) {
   return item.identifier ?? (!item.context.matchType.cache ? buildFromDeclaration(item.word, item.context) : undefined);
+}
+
+function appendMapHover(markdown: MarkdownString, position: Position) {
+  const identifier = getMapIdentifierAtPosition(position);
+  if (!identifier) return;
+  const match = getMatchTypeById(identifier.matchId);
+  if (!match) return;
+  const hoverDisplayItems = getHoverItems(false, match);
+  if (hoverDisplayItems.length === 0) return undefined;
+  appendIdentifierHover(markdown, identifier, hoverDisplayItems);
 }
 
 function appendHover(markdown: MarkdownString, document: TextDocument, position: Position, item: Item | undefined): void {
@@ -39,8 +56,8 @@ function appendHover(markdown: MarkdownString, document: TextDocument, position:
   }
 
   // If no config found, or no items to display then exit early
-  const hoverDisplayItems = item.context.declaration ? getDeclarationHoverItems(item.context.matchType) : getReferenceHoverItems(item.context.matchType);
-  if (!Array.isArray(hoverDisplayItems) || hoverDisplayItems.length === 0) {
+  const hoverDisplayItems = getHoverItems(item.context.declaration, item.context.matchType);
+  if (hoverDisplayItems.length === 0) {
     return undefined;
   }
 
@@ -50,12 +67,24 @@ function appendHover(markdown: MarkdownString, document: TextDocument, position:
     return undefined;
   }
 
+  appendIdentifierHover(markdown, identifier, hoverDisplayItems, item.context.cert)
+}
+
+function appendIdentifierHover(markdown: MarkdownString, identifier: Identifier, hoverItems: HoverDisplayItem[], isCert = false) {
   // Append the registered hoverDisplayItems defined in the matchType for the identifier
-  appendTitle(identifier.name, identifier.fileType, identifier.matchId, markdown, identifier.id, item.context.cert);
-  appendInfo(identifier, hoverDisplayItems, markdown);
-  appendValue(identifier, hoverDisplayItems, markdown);
-  appendSignature(identifier, hoverDisplayItems, markdown);
-  appendCodeBlock(identifier, hoverDisplayItems, markdown);
+  appendTitle(identifier.name, identifier.fileType, identifier.matchId, markdown, identifier.id, isCert);
+  appendInfo(identifier, hoverItems, markdown);
+  appendValue(identifier, hoverItems, markdown);
+  appendSignature(identifier, hoverItems, markdown);
+  appendCodeBlock(identifier, hoverItems, markdown);
+}
+
+function getHoverItems(isDeclaration: boolean, matchType: MatchType): HoverDisplayItem[] {
+  const hoverDisplayItems = isDeclaration ? getDeclarationHoverItems(matchType) : getReferenceHoverItems(matchType);
+  if (!Array.isArray(hoverDisplayItems) || hoverDisplayItems.length === 0) {
+    return [];
+  }
+  return hoverDisplayItems;
 }
 
 async function appendDebug(markdown: MarkdownString, document: TextDocument, position: Position, item: Item | undefined): Promise<void> {
@@ -65,5 +94,8 @@ async function appendDebug(markdown: MarkdownString, document: TextDocument, pos
     if (parsedWord) return appendDebugHover(markdown, parsedWord);
     const operator = getOperatorByDocPosition(position);
     if (operator) return appendOperatorHover(markdown, operator);
+    const stringRange = getStringRangeByDocPosition(position);
+    const interpRange = getInterpolationRangeByDocPosition(position);
+    if (stringRange && !interpRange) return appendStringHover(markdown, stringRange);
   }
 }

@@ -1,6 +1,6 @@
 import { Position, Range, type TextEditor } from 'vscode';
 import { DecorationRangeBehavior, window } from "vscode";
-import { getAllMatches, getAllOperatorTokens, getAllParsedWords } from '../cache/activeFileCache';
+import { getAllInterpolationRanges, getAllMatches, getAllOperatorTokens, getAllParsedWords, getAllStringRanges } from '../cache/activeFileCache';
 import { isDevMode } from './devMode';
 
 const matchDecoration = window.createTextEditorDecorationType({
@@ -15,6 +15,11 @@ const wordDecoration = window.createTextEditorDecorationType({
 
 const operatorDecoration = window.createTextEditorDecorationType({
   backgroundColor: 'rgba(160, 80, 255, 0.25)',
+  rangeBehavior: DecorationRangeBehavior.ClosedClosed
+});
+
+const stringDecoration = window.createTextEditorDecorationType({
+  backgroundColor: 'rgba(255, 170, 60, 0.20)',
   rangeBehavior: DecorationRangeBehavior.ClosedClosed
 });
 
@@ -35,6 +40,8 @@ export function rebuildHighlights(): void {
 function buildHighlights(editor: TextEditor, mode = HighlightMode.AllWords) {
   editor.setDecorations(matchDecoration, []);
   editor.setDecorations(wordDecoration, []);
+  editor.setDecorations(operatorDecoration, []);
+  editor.setDecorations(stringDecoration, []);
   switch (mode) {
     case HighlightMode.Matches:
       editor.setDecorations(matchDecoration, getMatchRanges());
@@ -43,6 +50,7 @@ function buildHighlights(editor: TextEditor, mode = HighlightMode.AllWords) {
       editor.setDecorations(matchDecoration, getMatchRanges());
       editor.setDecorations(wordDecoration, getWordRanges());
       editor.setDecorations(operatorDecoration, getOperatorTokenRanges());
+      editor.setDecorations(stringDecoration, getStringRanges());
       break;
   }
 }
@@ -66,4 +74,42 @@ function getOperatorTokenRanges(): Range[] {
     operatorTokens.forEach(operator => operatorRanges.push(new Range(new Position(lineNum, operator.index), new Position(lineNum, operator.index + operator.token.length))));
   });
   return operatorRanges;
+}
+
+function getStringRanges(): Range[] {
+  const stringRanges: Range[] = [];
+  const interpolationRanges = getAllInterpolationRanges();
+  getAllStringRanges().forEach((strings, lineNum) => {
+    const interp = interpolationRanges.get(lineNum) ?? [];
+    strings.forEach(stringRange => {
+      const segments = subtractRanges(stringRange, interp);
+      segments.forEach(segment => {
+        stringRanges.push(new Range(new Position(lineNum, segment.start), new Position(lineNum, segment.end + 1)));
+      });
+    });
+  });
+  return stringRanges;
+}
+
+function subtractRanges(base: { start: number; end: number; }, exclusions: { start: number; end: number; }[]): { start: number; end: number; }[] {
+  let segments: { start: number; end: number; }[] = [base];
+  for (const exclusion of exclusions) {
+    segments = segments.flatMap(segment => subtractSingleRange(segment, exclusion));
+    if (segments.length === 0) break;
+  }
+  return segments;
+}
+
+function subtractSingleRange(base: { start: number; end: number; }, exclusion: { start: number; end: number; }): { start: number; end: number; }[] {
+  if (exclusion.end < base.start || exclusion.start > base.end) {
+    return [base];
+  }
+  const result: { start: number; end: number; }[] = [];
+  if (exclusion.start > base.start) {
+    result.push({ start: base.start, end: exclusion.start - 1 });
+  }
+  if (exclusion.end < base.end) {
+    result.push({ start: exclusion.end + 1, end: base.end });
+  }
+  return result;
 }

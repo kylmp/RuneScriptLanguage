@@ -1,21 +1,21 @@
 import type { ConfigurationChangeEvent, ExtensionContext, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextEditor, Uri } from "vscode";
 import { window, workspace } from "vscode";
-import { clearAllDiagnostics, handleFileUpdate } from "./diagnostics";
+import { clearAllDiagnostics, handleFileCreated as handleFileCreatedDiagnostics, handleFileDeleted as handleFileDeletedDiagnostics, handleFileUpdate as handleFileUpdateDiagnostics } from "./diagnostics";
 import { getFileText, isActiveFile, isValidFile } from "../utils/fileUtils";
 import { addUris, removeUris } from "../cache/projectFilesCache";
 import { eventAffectsSetting, getSettingValue, Settings } from "./settings";
-import { clearDevModeOutput, initDevMode, logEvent, logFileEvent, logSettingsEvent, LogType } from "./devMode";
+import { clearDevModeOutput, initDevMode, logEvent, logFileEvent, logSettingsEvent, Events } from "./devMode";
 import { getLines } from "../utils/stringUtils";
-import { clearFile, processAllFiles, queueFileRebuild } from "./manager";
-import { monitoredFileTypes } from "../runescriptExtension";
+import { allFileTypes, clearFile, processAllFiles, queueFileRebuild } from "./manager";
 import { parseFile, reparseFileWithChanges } from "../parsing/fileParser";
 import { getFileIdentifiers } from "../cache/identifierCache";
+import { handleMapFileClosed, handleMapFileEdited, handleMapFileOpened, isMapFile } from "./mapManager";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
 
 export function registerEventHandlers(context: ExtensionContext): void {
-  const patterns = Array.from(monitoredFileTypes, ext => `**/*.${ext}`);
+  const patterns = Array.from(allFileTypes, ext => `**/*.${ext}`);
   const fileWatcher = workspace.createFileSystemWatcher(`{${patterns.join(',')}}`);
   const gitBranchWatcher = workspace.createFileSystemWatcher('**/.git/HEAD');
   gitBranchWatcher.onDidCreate(onGitBranchChange);
@@ -43,7 +43,9 @@ let pendingRebuildResolve: (() => void) | undefined;
 const lastRebuildVersionByUri = new Map<string, number>();
 const rebuildWaiters: Array<{ uri: string; version: number; resolve: () => void }> = [];
 function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void {
-  if (!isActiveFile(textChangeEvent.document.uri) || !isValidFile(textChangeEvent.document.uri)) return;
+  if (!isActiveFile(textChangeEvent.document.uri)) return;
+  if (isMapFile(textChangeEvent.document.uri)) return handleMapFileEdited(textChangeEvent);
+  if (!isValidFile(textChangeEvent.document.uri)) return;
 
   pendingDocument = textChangeEvent.document;
   pendingChanges.push(...textChangeEvent.contentChanges);
@@ -57,7 +59,7 @@ function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void 
   pendingTimer = setTimeout(() => {
     const doc = pendingDocument;
     if (!doc) return;
-    logFileEvent(doc.uri, LogType.ActiveFileTextChanged, `partial reparse`);
+    logFileEvent(doc.uri, Events.ActiveFileTextChanged, `partial reparse`);
     const changes = pendingChanges;
     pendingChanges = [];
     pendingTimer = undefined;
@@ -90,35 +92,42 @@ export function waitForActiveFileRebuild(document: TextDocument, version = docum
 
 async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<void> {
   if (!editor) return;
+  if (isMapFile(editor.document.uri)) {
+    return handleMapFileOpened(editor.document);
+  } else {
+    handleMapFileClosed();
+  }
   if (!isValidFile(editor.document.uri)) return;
-  logFileEvent(editor.document.uri, LogType.ActiveFileChanged, 'full reparse');
+  logFileEvent(editor.document.uri, Events.ActiveFileChanged, 'full reparse');
   updateFileFromDocument(editor.document);
 }
 
 function onDeleteFile(uri: Uri) {
-  if (!isValidFile(uri)) return;
-  logFileEvent(uri, LogType.FileDeleted, 'relevant cache entries invalidated');
-  handleFileUpdate(getFileIdentifiers(uri), undefined);
-  clearFile(uri);
+  logFileEvent(uri, Events.FileDeleted, 'relevant cache entries invalidated');
+  handleFileDeletedDiagnostics(uri);
   removeUris([uri]);
+  if (!isValidFile(uri)) return;
+  handleFileUpdateDiagnostics(getFileIdentifiers(uri), undefined);
+  clearFile(uri);
 }
 
 function onCreateFile(uri: Uri) {
-  if (!isValidFile(uri)) return;
-  logFileEvent(uri, LogType.FileCreated, 'full parse');
-  void updateFileFromUri(uri);
+  logFileEvent(uri, Events.FileCreated, 'full parse');
+  handleFileCreatedDiagnostics(uri);
   addUris([uri]);
+  if (!isValidFile(uri)) return;
+  void updateFileFromUri(uri);
 }
 
 function onChangeFile(uri: Uri) {
   if (isActiveFile(uri)) return; // let the active document text change event handle active file changes
   if (!isValidFile(uri)) return;
-  logFileEvent(uri, LogType.FileChanged, 'full reparse');
+  logFileEvent(uri, Events.FileChanged, 'full reparse');
   void updateFileFromUri(uri);
 }
 
 function onGitBranchChange() {
-  logEvent(LogType.GitBranchChanged, () => 'full cache rebuild');
+  logEvent(Events.GitBranchChanged, () => 'full cache rebuild');
   processAllFiles();
 }
 

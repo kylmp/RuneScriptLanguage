@@ -1,5 +1,5 @@
 import type { Position, TextDocument, Uri } from "vscode";
-import type { DataRange, Identifier, IdentifierText, Item, MatchResult, MatchType, OperatorToken, ParsedFile, ParsedWord } from "../types";
+import type { DataRange, Identifier, IdentifierText, Item, MatchResult, MatchType, OperatorToken, ParsedFile, ParsedWord, TextRange } from "../types";
 import { get as getIdentifier } from "./identifierCache";
 import { LOCAL_VAR, QUEUE, SKIP, KEYWORD, TRIGGER, UNKNOWN } from "../matching/matchType";
 import { decodeReferenceToLocation, resolveFileKey, resolveKeyFromIdentifier } from "../utils/cacheUtils";
@@ -37,6 +37,18 @@ let parsedWords: Map<number, ParsedWord[]> = new Map();
  * The value is an array of parsed operator tokens on that line
  */
 let operatorTokens: Map<number, OperatorToken[]> = new Map();
+
+/**
+ * File parsed string ranges, keyed by line number
+ * The value is an array of string ranges on that line
+ */
+let stringRanges: Map<number, TextRange[]> = new Map();
+
+/**
+ * File parsed interpolation ranges, keyed by line number
+ * The value is an array of interpolation ranges on that line
+ */
+let interpolationRanges: Map<number, TextRange[]> = new Map();
 
 // ===== GET DATA ===== //
 
@@ -84,6 +96,30 @@ export function getOperatorByDocPosition(position: Position): OperatorToken | un
   const lineOperators = operatorTokens.get(position.line);
   if (lineOperators) {
     return findMatchInRange(position.character, lineOperators.map(operator => ({start: operator.index, end: operator.index + operator.token.length, data: operator})))?.data;
+  }
+}
+
+/**
+ * Returns a string range at the given position in the document, if it exists
+ * @param position The position (line num + index) to get the string range for
+ * @returns The string range at that position, if exists
+ */
+export function getStringRangeByDocPosition(position: Position): TextRange | undefined {
+  const lineStrings = stringRanges.get(position.line);
+  if (lineStrings) {
+    return findMatchInRange(position.character, lineStrings.map(range => ({ start: range.start, end: range.end, data: range })))?.data;
+  }
+}
+
+/**
+ * Returns an interpolation range at the given position in the document, if it exists
+ * @param position The position (line num + index) to get the interpolation range for
+ * @returns The interpolation range at that position, if exists
+ */
+export function getInterpolationRangeByDocPosition(position: Position): TextRange | undefined {
+  const lineRanges = interpolationRanges.get(position.line);
+  if (lineRanges) {
+    return findMatchInRange(position.character, lineRanges.map(range => ({ start: range.start, end: range.end, data: range })))?.data;
   }
 }
 
@@ -176,6 +212,20 @@ export function getAllOperatorTokens(): Map<number, OperatorToken[]> {
   return operatorTokens;
 }
 
+/**
+ * Returns all of the string ranges for the file
+ */
+export function getAllStringRanges(): Map<number, TextRange[]> {
+  return stringRanges;
+}
+
+/**
+ * Returns all of the interpolation ranges for the file
+ */
+export function getAllInterpolationRanges(): Map<number, TextRange[]> {
+  return interpolationRanges;
+}
+
 // ==== CACHE POPULATING FUNCTIONS ==== // 
 
 /**
@@ -186,6 +236,8 @@ export function init(uri: Uri, parsedFile: ParsedFile) {
   fileMatches.clear();
   parsedWords = parsedFile.parsedWords;
   operatorTokens = parsedFile.operatorTokens;
+  stringRanges = parsedFile.stringRanges;
+  interpolationRanges = parsedFile.interpolationRanges;
   localVarCache.clear();
   codeBlockCache.clear();
   switchStmtCache.clear();
@@ -200,6 +252,8 @@ export function clear() {
   fileMatches.clear();
   parsedWords = new Map();
   operatorTokens = new Map();
+  stringRanges = new Map();
+  interpolationRanges = new Map();
   localVarCache.clear();
   codeBlockCache.clear();
   switchStmtCache.clear();

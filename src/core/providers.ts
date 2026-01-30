@@ -20,6 +20,12 @@ export function registerProviders(context: ExtensionContext) {
     registerSignatureHelpProviders(language, context);
     registerCompletionProviders(language, context);
   } 
+  registerMapProviders(context);
+}
+
+function registerMapProviders(context: ExtensionContext): void {
+  context.subscriptions.push(languages.registerHoverProvider('jm2', hoverProvider(context)));
+  context.subscriptions.push(languages.registerDefinitionProvider('jm2', gotoDefinitionProvider));
 }
 
 function registerUniversalProviders(language: string, context: ExtensionContext): void {

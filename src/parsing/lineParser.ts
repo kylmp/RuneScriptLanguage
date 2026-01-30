@@ -25,11 +25,13 @@ type LineParseStateResult = {
   words: ParsedWord[];
   operators: OperatorToken[];
   stringRanges: Range[];
+  interpRanges: Range[];
   blockCommentRanges: Range[];
   nextState: ParserState;
 };
 
 const stringRangesByLine = new Map<number, Range[]>();
+const interpRangesByLine = new Map<number, Range[]>();
 const blockCommentRangesByLine = new Map<number, Range[]>();
 const wordsByLine = new Map<number, ParsedWord[]>();
 const operatorsByLine = new Map<number, OperatorToken[]>();
@@ -83,6 +85,7 @@ export function resetLineParser(uri?: Uri): void {
   state.paramIndexStack = resetState.paramIndexStack;
   state.interpParenDepthStack = resetState.interpParenDepthStack;
   stringRangesByLine.clear();
+  interpRangesByLine.clear();
   blockCommentRangesByLine.clear();
   wordsByLine.clear();
   operatorsByLine.clear();
@@ -92,6 +95,14 @@ export function resetLineParser(uri?: Uri): void {
 export function getStringRanges(lineNum?: number): Range[] | Map<number, Range[]> {
   if (lineNum === undefined) return stringRangesByLine;
   return stringRangesByLine.get(lineNum) ?? [];
+}
+
+export function getAllStringRanges(): Map<number, Range[]> {
+  return stringRangesByLine;
+}
+
+export function getAllInterpolationRanges(): Map<number, Range[]> {
+  return interpRangesByLine;
 }
 
 export function getBlockCommentRanges(lineNum?: number): Range[] | Map<number, Range[]> {
@@ -108,7 +119,12 @@ export function getAllWords(): Map<number, ParsedWord[]> {
 }
 
 export function getParsedFile(): ParsedFile {
-  return { parsedWords: getAllWords(), operatorTokens: getAllOperators() };
+  return {
+    parsedWords: getAllWords(),
+    operatorTokens: getAllOperators(),
+    stringRanges: getAllStringRanges(),
+    interpolationRanges: getAllInterpolationRanges()
+  };
 }
 
 export function getLineOperators(lineNum: number): OperatorToken[] {
@@ -132,12 +148,14 @@ export function applyLineChanges(document: TextDocument, startLine: number, endL
   if (lineDelta !== 0) {
     shiftLineMap(wordsByLine, startLine, endLine, lineDelta);
     shiftLineMap(stringRangesByLine, startLine, endLine, lineDelta);
+    shiftLineMap(interpRangesByLine, startLine, endLine, lineDelta);
     shiftLineMap(blockCommentRangesByLine, startLine, endLine, lineDelta);
     shiftLineMap(operatorsByLine, startLine, endLine, lineDelta);
     shiftLineMap(endStateByLine, startLine, endLine, lineDelta);
   } else {
     wordsByLine.delete(startLine);
     stringRangesByLine.delete(startLine);
+    interpRangesByLine.delete(startLine);
     blockCommentRangesByLine.delete(startLine);
     operatorsByLine.delete(startLine);
     endStateByLine.delete(startLine);
@@ -190,6 +208,8 @@ export function parseLine(lineText: string, lineNum: number, uri: Uri): ParsedWo
 
   if (result.stringRanges.length > 0) stringRangesByLine.set(lineNum, result.stringRanges);
   else stringRangesByLine.delete(lineNum);
+  if (result.interpRanges.length > 0) interpRangesByLine.set(lineNum, result.interpRanges);
+  else interpRangesByLine.delete(lineNum);
   if (result.blockCommentRanges.length > 0) blockCommentRangesByLine.set(lineNum, result.blockCommentRanges);
   else blockCommentRangesByLine.delete(lineNum);
   if (result.words.length > 0) wordsByLine.set(lineNum, result.words);
@@ -215,6 +235,8 @@ export function parseLineFromCache(lineText: string, lineNum: number, uri: Uri):
   const result = parseLineWithState(lineText, lineNum, { ...startState, fileKey });
   if (result.stringRanges.length > 0) stringRangesByLine.set(lineNum, result.stringRanges);
   else stringRangesByLine.delete(lineNum);
+  if (result.interpRanges.length > 0) interpRangesByLine.set(lineNum, result.interpRanges);
+  else interpRangesByLine.delete(lineNum);
   if (result.blockCommentRanges.length > 0) blockCommentRangesByLine.set(lineNum, result.blockCommentRanges);
   else blockCommentRangesByLine.delete(lineNum);
   if (result.words.length > 0) wordsByLine.set(lineNum, result.words);
@@ -284,11 +306,12 @@ export function getCallStateAtPosition(lineText: string, lineNum: number, uri: U
 
 function parseLineWithState(lineText: string, _lineNum: number, startState: ParserState): LineParseStateResult {
   if (lineText.startsWith("text=") || lineText.startsWith("activetext=")) {
-    return { words: [], operators: [], stringRanges: [], blockCommentRanges: [], nextState: cloneParserState(startState) };
+    return { words: [], operators: [], stringRanges: [], interpRanges: [], blockCommentRanges: [], nextState: cloneParserState(startState) };
   }
   const words: ParsedWord[] = [];
   const operators: OperatorToken[] = [];
   const stringRanges: Range[] = [];
+  const interpRanges: Range[] = [];
   const blockCommentRanges: Range[] = [];
   const nextState = cloneParserState(startState);
 
@@ -315,6 +338,7 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
   let inConfigValue = false;
 
   let stringStart: number | undefined = nextState.inString ? 0 : undefined;
+  const interpStartStack: number[] = [];
   let blockStart: number | undefined = nextState.inBlockComment ? 0 : undefined;
 
   const finalizeWord = (endIndex: number) => {
@@ -415,12 +439,15 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
 
     if (nextState.inString && !nextState.inInterpolationString && ch === '<') {
       finalizeWord(i - 1);
+      interpStartStack.push(i);
       nextState.interpDepth++;
       interpParenDepthStack.push(parenDepth);
       continue;
     }
     if (nextState.inString && !nextState.inInterpolationString && nextState.interpDepth > 0 && ch === '>') {
       finalizeWord(i - 1);
+      const interpStart = interpStartStack.pop();
+      if (interpStart !== undefined) interpRanges.push({ start: interpStart, end: i });
       nextState.interpDepth = Math.max(0, nextState.interpDepth - 1);
       interpParenDepthStack.pop();
       continue;
@@ -605,7 +632,7 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
 
   nextState.parenDepth = parenDepth;
   nextState.braceDepth = braceDepth;
-  return { words, operators, stringRanges, blockCommentRanges, nextState };
+  return { words, operators, stringRanges, interpRanges, blockCommentRanges, nextState };
 }
 
 function statesEqual(a: ParserState, b: ParserState): boolean {

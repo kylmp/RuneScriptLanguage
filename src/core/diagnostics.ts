@@ -5,8 +5,10 @@ import { languages, Range, Uri } from 'vscode';
 import { getSettingValue, Settings } from './settings';
 import { UnknownIdentifierDiagnostic } from '../diagnostics/unknownIdentifierDiagnostic';
 import { UnknownFileDiagnostic } from '../diagnostics/unknownFileDiagnostic';
-import { getByKey } from '../cache/identifierCache';
+import { get as getIdentifier, getByKey } from '../cache/identifierCache';
 import { decodeReferenceToRange } from '../utils/cacheUtils';
+import { getFileInfo, getFileName } from '../utils/fileUtils';
+import { getAllMatchTypes } from '../matching/matchType';
 
 let diagnostics: DiagnosticCollection | undefined;
 
@@ -41,6 +43,11 @@ export function clearFileDiagnostics(uri: Uri): void {
 
 export function getFileDiagnostics(uri: Uri): readonly Diagnostic[] {
   return diagnostics?.get(uri) || [];
+}
+
+export function setCustomDiagnostics(uri: Uri, diagnosticsList: Diagnostic[]): void {
+  if (!getSettingValue(Settings.ShowDiagnostics) || !diagnostics) return;
+  diagnostics.set(uri, diagnosticsList);
 }
 
 export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult[]): Promise<void> {
@@ -112,6 +119,40 @@ export function handleFileUpdate(before?: FileIdentifiers, after?: FileIdentifie
       }
       diagnostics.set(uri, fileDiagnostics);
     }
+  }
+}
+
+export function handleFileCreated(uri: Uri) {
+  const fileKey = getFileName(uri);
+  const diagnostics = unknownFileDiagnostic.clearUnknowns(fileKey);
+  for (const [uri, ranges] of diagnostics) {
+    removeDiagnostics(Uri.file(uri), ranges);
+  }
+}
+
+export function handleFileDeleted(uri: Uri) {
+  // If I delete name.if, I know that the identifier with cache key nameINTERFACE reference ranges
+  // need to add the "unknown file" diagnostic
+  if (!diagnostics) return;
+  const fileInfo = getFileInfo(uri);
+  if (fileInfo.type === 'rs2') return;
+  const fileKey = `${fileInfo.name}.${fileInfo.type}`;
+  const match = getAllMatchTypes().find(m => m.fileTypes?.includes(fileInfo.type));
+  if (!match) return;
+  const identifier = getIdentifier(fileInfo.name, match);
+  if (!identifier) return;
+  for (const [fsPath, locations] of Object.entries(identifier.references)) {
+    const uri = Uri.file(fsPath);
+    const fileDiagnostics = [...(diagnostics.get(uri) ?? [])];
+    for (const location of locations) {
+      const range = decodeReferenceToRange(location);
+      if (!range) continue;
+      const exists = fileDiagnostics.some(d => d.range.isEqual(range));
+      if (!exists) {
+        fileDiagnostics.push(unknownFileDiagnostic.createByFileKey(range, fileKey, fsPath));
+      }
+    }
+    diagnostics.set(uri, fileDiagnostics);
   }
 }
 

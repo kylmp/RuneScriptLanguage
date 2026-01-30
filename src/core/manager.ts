@@ -13,11 +13,16 @@ import { registerCommands } from "./commands";
 import { registerEventHandlers } from "./eventHandlers";
 import { registerProviders } from "./providers";
 import { parseFile } from "../parsing/fileParser";
-import { monitoredFileTypes } from "../runescriptExtension";
 import { findFileExceptionWords } from "../parsing/wordExceptions";
 import { isDevMode, logFileRebuild, rebuildMetrics, registerDevMode, reportRebuildMetrics } from "./devMode";
+import { clear as clearIdCache, clearAll as clearAllIds } from "../cache/idCache";
+import { clear as clearMap, handleMapFileOpened, isMapFile } from "./mapManager";
+import { getAllMatchTypes } from "../matching/matchType";
 
 export function initializeExtension(context: ExtensionContext) {
+  buildMonitoredFileTypes();
+  buildAllFileTypes();
+
   registerDiagnostics(context);
   registerCommands(context);
   registerEventHandlers(context);
@@ -41,6 +46,7 @@ export function processAllFiles() {
     cancellable: false
   }, async () => {
     clearAll();
+    await rebuildProjectFilesCache();
     await rebuildAllFiles();
     void rebuildActiveFile();
     reportRebuildMetrics();
@@ -130,6 +136,7 @@ async function rebuildFile(uri: Uri, lines: string[], parsedFile: ParsedFile, qu
 async function rebuildActiveFile(): Promise<void> {
   const activeFile = getActiveFile();
   if (activeFile) {
+    if (isMapFile(activeFile)) return handleMapFileOpened(await workspace.openTextDocument(activeFile));
     const fileText = await getFileText(activeFile);
     void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText));
   }
@@ -142,6 +149,8 @@ export function clearAll() {
   clearIdentifierCache();
   clearAllDiagnostics();
   clearActiveFileCache();
+  clearAllIds();
+  clearMap();
 }
 
 /**
@@ -159,4 +168,33 @@ function dispose() {
 export function clearFile(uri: Uri) {
   clearIdentifierFile(uri);
   clearFileDiagnostics(uri);
+  clearIdCache(uri);
+}
+
+/**
+* Files which this extension is interested in
+*/
+export const monitoredFileTypes = new Set<string>();
+function buildMonitoredFileTypes(): void {
+  monitoredFileTypes.add('pack');
+  getAllMatchTypes().filter(match => !match.referenceOnly).forEach(match => {
+    const fileTypes = match.fileTypes || [];
+    for (const fileType of fileTypes) {
+      monitoredFileTypes.add(fileType);
+    }
+  });
+}
+
+/**
+* Files which this extension is interested in
+*/
+export const allFileTypes = new Set<string>();
+function buildAllFileTypes(): void {
+  allFileTypes.add('pack');
+  getAllMatchTypes().forEach(match => {
+    const fileTypes = match.fileTypes || [];
+    for (const fileType of fileTypes) {
+      allFileTypes.add(fileType);
+    }
+  });
 }

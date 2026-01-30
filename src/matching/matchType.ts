@@ -236,7 +236,7 @@ export const SKIP: MatchType = defineMatchType({ id: 'SKIP', types: [], fileType
 export const NUMBER: MatchType = defineMatchType({ id: 'NUMBER', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
 export const KEYWORD: MatchType = defineMatchType({ id: 'KEYWORD', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
 export const TYPE: MatchType = defineMatchType({ id: 'TYPE', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
-export const BOOLEAN: MatchType = defineMatchType({ id: 'BOOLEAN', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
+export const BOOLEAN: MatchType = defineMatchType({ id: 'BOOLEAN', types: [], fileTypes: [], cache: false, allowRename: false, noop: true, comparisonType: 'boolean' });
 export const NULL: MatchType = defineMatchType({ id: 'NULL', types: [], fileTypes: [], cache: false, allowRename: false, noop: true });
 
 function getMatchTypeById(id: string): MatchType | undefined {
