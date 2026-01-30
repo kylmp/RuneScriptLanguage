@@ -1,5 +1,5 @@
 import type { ExtensionContext, QuickPickItem } from 'vscode';
-import { commands, ExtensionMode, StatusBarAlignment, window, workspace } from 'vscode';
+import { commands, ExtensionMode, Position, Range, Selection, StatusBarAlignment, TextEditorRevealType, window, workspace } from 'vscode';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { getCacheKeys, serializeCache } from '../cache/identifierCache';
@@ -14,7 +14,7 @@ import { showIdentifierLookupView } from '../webview/identifierLookupView';
 interface Command {
   id: string;
   debug?: { label: string };
-  command: () => Promise<void>;
+  command: (...args: any[]) => Promise<void>;
 }
 
 /**
@@ -63,6 +63,10 @@ export const extensionCommands: Record<string, Command> = {
     id: 'RuneScriptLanguage.lookupIdentifier',
     debug: { label: 'Lookup identifier (webview)' },
     command: lookupIdentifier
+  },
+  jumpToMapSection: {
+    id: 'RuneScriptLanguage.jumpToMapSection',
+    command: jumpToMapSection
   }
 };
 
@@ -82,6 +86,14 @@ async function dumpCacheKeys() {
 
 async function lookupIdentifier() {
   showIdentifierLookupView();
+}
+
+async function jumpToMapSection(line?: number) {
+  const editor = window.activeTextEditor;
+  if (!editor || line === undefined) return;
+  const position = new Position(line, 0);
+  editor.selection = new Selection(position, position);
+  editor.revealRange(new Range(position, position), TextEditorRevealType.AtTop);
 }
 
 interface DebugMenuItem extends QuickPickItem {

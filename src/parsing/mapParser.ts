@@ -23,6 +23,7 @@ export type MapParseError = {
 export type MapParseResult = {
   entries: MapEntry[];
   errors: MapParseError[];
+  sections: Array<{ line: number; name: string }>;
 };
 
 const sectionRegex = /^====\s*(\w+)\s*====\s*$/;
@@ -31,6 +32,7 @@ const lineRegex = /^(\s*)(\d+)\s+(\d+)\s+(\d+)\s*:\s*(.+)\s*$/;
 export function parseMapFile(lines: string[]): MapParseResult {
   const entries: MapEntry[] = [];
   const errors: MapParseError[] = [];
+  const sections: Array<{ line: number; name: string }> = [];
   let currentSection: MapEntryKind | undefined;
 
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
@@ -38,6 +40,7 @@ export function parseMapFile(lines: string[]): MapParseResult {
     const sectionMatch = sectionRegex.exec(line);
     if (sectionMatch) {
       const name = sectionMatch[1]?.toLowerCase();
+      sections.push({ line: lineNum, name: (sectionMatch[1] ?? '').toUpperCase() });
       if (name === 'loc' || name === 'npc' || name === 'obj') {
         currentSection = name;
       } else {
@@ -102,7 +105,7 @@ export function parseMapFile(lines: string[]): MapParseResult {
     });
   }
 
-  return { entries, errors };
+  return { entries, errors, sections };
 }
 
 function parseIntStrict(value?: string): number | undefined {

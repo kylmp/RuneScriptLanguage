@@ -19,6 +19,7 @@ let activeChunkX: number | undefined;
 let activeChunkZ: number | undefined;
 let entriesByLine = new Map<number, MapEntry>();
 let errorsByLine = new Map<number, MapParseError>();
+let sectionsByLine = new Map<number, string>();
 let pendingEditTimer: NodeJS.Timeout | undefined;
 let pendingEditDocument: TextDocument | undefined;
 let pendingStartLine = Number.MAX_SAFE_INTEGER;
@@ -37,11 +38,23 @@ const mapDecoration = window.createTextEditorDecorationType({
 
 export function getIdentifierAtPosition(position: Position): Identifier | undefined {
   const entry = entriesByLine.get(position.line);
-  if (!entry || !entry.idRange.contains(position)) return undefined;
+  if (!entry) return undefined;
+  const { start, end } = entry.idRange;
+  if (position.line !== start.line) return;
+  if (position.character < start.character || position.character >= end.character) return;
   const type = entry.kind.toUpperCase();
   const name = getIdName(type, String(entry.id));
   if (!name) return undefined;
   return getIdentifierByKey(name + type);
+}
+
+export function getMapSectionHeaders(document: TextDocument): Array<{ line: number; name: string }> {
+  if (activeMapFile !== document.uri.fsPath) return [];
+  const sections: Array<{ line: number; name: string }> = [];
+  for (const [line, name] of sectionsByLine) {
+    sections.push({ line, name });
+  }
+  return sections.sort((a, b) => a.line - b.line);
 }
 
 
@@ -116,6 +129,7 @@ export function clear() {
   activeChunkZ = undefined;
   entriesByLine = new Map();
   errorsByLine = new Map();
+  sectionsByLine = new Map();
   if (pendingEditTimer) {
     clearTimeout(pendingEditTimer);
     pendingEditTimer = undefined;
@@ -216,12 +230,17 @@ function indexResult(result: MapParseResult, lineOffset: number) {
     const line = error.line + lineOffset;
     errorsByLine.set(line, offsetError(error, lineOffset));
   }
+  for (const section of result.sections) {
+    const line = section.line + lineOffset;
+    sectionsByLine.set(line, section.name);
+  }
 }
 
 function replaceRange(startLine: number, endLine: number, result: MapParseResult) {
   for (let line = startLine; line <= endLine; line++) {
     entriesByLine.delete(line);
     errorsByLine.delete(line);
+    sectionsByLine.delete(line);
   }
   indexResult(result, startLine);
 }

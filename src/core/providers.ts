@@ -12,6 +12,7 @@ import { signatureHelpProvider, signatureMetadata } from "../provider/signatureH
 import { configHelpProvider, configMetadata } from "../provider/signatureHelp/configSignatureHelpProvider";
 import { semanticTokensLegend, semanticTokensProvider } from "../provider/semanticTokensProvider";
 import { languageIds } from "../runescriptExtension";
+import { mapCodelensProvider } from "../provider/mapCodelensProvider";
 
 export function registerProviders(context: ExtensionContext) {
   for (const language of languageIds) {
@@ -26,6 +27,7 @@ export function registerProviders(context: ExtensionContext) {
 function registerMapProviders(context: ExtensionContext): void {
   context.subscriptions.push(languages.registerHoverProvider('jm2', hoverProvider(context)));
   context.subscriptions.push(languages.registerDefinitionProvider('jm2', gotoDefinitionProvider));
+  context.subscriptions.push(languages.registerCodeLensProvider('jm2', mapCodelensProvider));
 }
 
 function registerUniversalProviders(language: string, context: ExtensionContext): void {
