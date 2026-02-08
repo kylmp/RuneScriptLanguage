@@ -81,7 +81,7 @@
                 },
                 {
                     "comment": "Interface type values",
-                    "match": "^(type)=(layer|inv|rect|text|graphic|model|invtext)?",
+                    "match": "^(type)=(invtext|layer|inv|rect|text|graphic|model)?",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"
@@ -117,7 +117,7 @@
                 },
                 {
                     "comment": "Interface font values",
-                    "match": "^(font)=(p11_full|p12_full|b12_full|q8_full)?",
+                    "match": "^(font)=(p11_full|p11|p12_full|p12|b12_full|b12|q8_full|q8)?",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"
@@ -144,7 +144,7 @@
                 },
                 {
                     "comment": "Interface script op values",
-                    "match": "^(script\\d+op\\d+)=(\\w+)$",
+                    "match": "^(script\\d+op\\d+)=(\\w+(?::\\w+)?)$",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"
@@ -156,7 +156,7 @@
                 },
                 {
                     "comment": "Interface script op values 2",
-                    "match": "^(script\\d+op\\d+)=(\\w+),(\\w+)$",
+                    "match": "^(script\\d+op\\d+)=(\\w+(?::\\w+)?),(\\w+(?::\\w+)?)$",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"
@@ -171,7 +171,7 @@
                 },
                 {
                     "comment": "Interface script op values 3",
-                    "match": "^(script\\d+op\\d+)=(\\w+),(\\w+),(\\w+)$",
+                    "match": "^(script\\d+op\\d+)=(\\w+(?::\\w+)?),(\\w+(?::\\w+)?),(\\w+(?::\\w+)?)$",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.interface.key"

@@ -141,7 +141,7 @@
                 },
                 {
                     "comment": "Hunt find_newmode values",
-                    "match": "^(find_newmode)=(opplayer[1-5]|applayer[1-5]|queue[1-20])?",
+                    "match": "^(find_newmode)=(opplayer[1-5]|applayer[1-5]|queue([1-9]|1[0-9]|20))?",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.huntconfig.key"
@@ -166,6 +166,18 @@
                 {
                     "comment": "Hunt check_notbusy values",
                     "match": "^(check_afk)=(off|on)?",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.language.huntconfig"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt check_category values",
+                    "match": "^(check_category)=(.+)",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.huntconfig.key"
