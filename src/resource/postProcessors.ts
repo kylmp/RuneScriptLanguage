@@ -3,6 +3,7 @@ import { END_OF_LINE_REGEX } from '../enum/regex';
 import { matchConfigKeyInfo } from './configKeyInfo';
 import { matchTriggerInfo } from './triggerInfo';
 import { getLineText } from '../utils/stringUtils';
+import { isTypeKeyword, Type } from '../enum/type';
 
 // Post processors are used for any additional post modification needed for a matchType, after an identifier has been built
 // postProcessors must be a function which takes indentifier as an input, and directly modifies that identifier as necessary
@@ -20,26 +21,34 @@ export const enumPostProcessor: PostProcessor = function(identifier) {
   const outputType = getLineText(block.code.substring(block.code.indexOf("outputtype="))).substring(11);
   const params = [{type: inputType, name: '', matchTypeId: ''}, {type: outputType, name: '', matchTypeId: ''}];
   identifier.signature = { params: params, paramsText: '', returns: [], returnsText: ''};
-  identifier.comparisonType = outputType;
+  identifier.comparisonTypes = isTypeKeyword(outputType) ? [outputType] : []
 };
 
 export const localVarPostProcessor: PostProcessor = function(identifier) {
-  identifier.comparisonType = identifier.extraData!.type;
+  identifier.comparisonTypes = [identifier.extraData!.type];
 };
 
 export const globalVarPostProcessor: PostProcessor = function(identifier) {
   const index = identifier.block!.code.indexOf("type=");
-  const dataType = (index < 0) ? 'int' : getLineText(identifier.block!.code.substring(index)).substring(5);
+  const dataType = (index < 0) ? Type.Int : getLineText(identifier.block!.code.substring(index)).substring(5);
   identifier.extraData = { dataType: dataType };
-  identifier.comparisonType = dataType;
+  identifier.comparisonTypes = isTypeKeyword(dataType) ? [dataType] : []
 };
 
 export const paramPostProcessor: PostProcessor = function(identifier) {
   const index = identifier.block!.code.indexOf("type=");
-  const dataType = (index < 0) ? 'int' : getLineText(identifier.block!.code.substring(index)).substring(5);
+  const dataType = (index < 0) ? Type.Int : getLineText(identifier.block!.code.substring(index)).substring(5);
   identifier.signature = { params: [{type: dataType, name: '', matchTypeId: ''}], paramsText: '', returns: [], returnsText: ''};
-  identifier.comparisonType = dataType;
+  identifier.comparisonTypes = isTypeKeyword(dataType) ? [dataType] : []
 };
+
+export const procPostProcessor: PostProcessor = function(identifier) {
+  identifier.comparisonTypes = (identifier.signature?.returnsText ?? '').split(', ').filter(t => isTypeKeyword(t)).map(t => t as Type); 
+}
+
+export const commandPostProcessor: PostProcessor = function(identifier) {
+  identifier.comparisonTypes = (identifier.signature?.returnsText ?? '').split(', ').filter(t => isTypeKeyword(t)).map(t => t as Type); 
+}
 
 export const configKeyPostProcessor: PostProcessor = function(identifier) {
   const info = matchConfigKeyInfo(identifier.name, identifier.fileType);

@@ -5,7 +5,7 @@ import type { ConfigKeyData } from "../types";
  * The source of the identifier for config keys which have dynamic varargs
  * Used by the matcher to retrieve the identifier which contains the signature type params 
  */
-export enum ConfigVarArgSrc {
+export enum ConfigVarArgSrc { 
   BlockName = 'blockName',
   FirstParam = 'firstParam'
 }

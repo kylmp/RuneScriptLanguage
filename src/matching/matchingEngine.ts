@@ -1,6 +1,6 @@
 import type { Uri } from 'vscode';
 import type { MatchContext, MatchResult, ParsedFile, ParsedWord } from '../types';
-import { CATEGORY, COMPONENT, DBCOLUMN, DBROW, DBTABLE, MODEL, NULL, OBJ, SKIP, UNKNOWN } from './matchType';
+import { CATEGORY, COMPONENT, CONSTANT, DBCOLUMN, DBROW, DBTABLE, MODEL, NULL, OBJ, SKIP, UNKNOWN } from './matchType';
 import { buildMatchContext, reference } from '../utils/matchUtils';
 import { LOC_MODEL_REGEX, TRIGGER_DEFINITION_REGEX } from '../enum/regex';
 import { packMatcher } from './matchers/packMatcher';
@@ -14,12 +14,15 @@ import { switchCaseMatcher } from './matchers/switchCaseMatcher';
 import { parametersMatcher } from './matchers/parametersMatcher';
 import { configDeclarationMatcher } from './matchers/configDeclarationMatcher';
 import { getFileInfo } from '../utils/fileUtils';
-import { getBlockScopeIdentifier, processMatch as addToActiveFileCache } from '../cache/activeFileCache';
+import { getBlockScopeIdentifier, processMatch as addToActiveFileCache, insertLineMatches } from '../cache/activeFileCache';
 import { columnDeclarationMatcher } from './matchers/columnDeclarationMatcher';
 import { constDeclarationMatcher } from './matchers/constMatcher';
 import { buildAndCacheIdentifier } from '../resource/identifierFactory';
 import { keywordTypeMatcher } from './matchers/keyWordTypeMatcher';
 import { booleanMatcher } from './matchers/booleanMatcher';
+import { get as getIdentifier } from '../cache/identifierCache';
+import { Type } from '../enum/type';
+import { matchFromOperators } from './operatorMatching';
 
 export const enum Engine {
   Config = 'config',
@@ -103,10 +106,14 @@ export function matchFile(uri: Uri, parsedFile: ParsedFile, lines: string[], dec
     }
     // Operator matching is separately handled and occurs per line, using the now processed matchResults
     if (isRunescript) {
-      // const lineOperators = parsedFile.operatorTokens.get(lineNum);
-      // operator matching
+      const operatorMatches: MatchResult[] = matchFromOperators(parsedFile, lineNum);
+      if (operatorMatches.length === 0) continue;
+      insertLineMatches(operatorMatches);
+      fileMatches.push(...operatorMatches);
+      operatorMatches.forEach(result => buildAndCacheIdentifier(result, uri, lineNum, lines));
     }
   }
+  setConstantTypes(fileMatches);
   return fileMatches;
 }
 
@@ -195,4 +202,22 @@ function response(ctx?: MatchContext): MatchResult | undefined {
     context.word.value = context.word.value.slice(0, lastUnderscore);
   }
   return { context: context, word: context.word.value };
+}
+
+export function setConstantTypes(results: MatchResult[]): void {
+  if (results.length > 0 && results[0].context.file.type === 'constant') {
+    for (let i = 0; i < results.length; i++) {
+      const curResult = results[i];
+      if (curResult.context.matchType.id !== CONSTANT.id) continue;
+      const constant = getIdentifier(curResult.word, curResult.context.matchType);
+      if (!constant) continue;
+      let comparisonType = Type.String;
+      if (results[i + 1]?.context.line.number === curResult.context.line.number) {
+        comparisonType = results[i + 1].context.matchType.comparisonType ?? Type.String;
+      }
+      if (comparisonType === Type.None) comparisonType = Type.String;
+      constant.comparisonTypes = [comparisonType];
+      constant.value = `Type: ${comparisonType}`;
+    }
+  }
 }

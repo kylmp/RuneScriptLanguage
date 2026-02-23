@@ -61,7 +61,7 @@ export function addReference(identifier: Identifier, fileKey: string, lineNum: n
 
 function process(identifier: Identifier, context: MatchContext, text?: IdentifierText): void {
   // Set the comparisonType for explicit comparison types from the match type 
-  if (context.matchType.comparisonType !== undefined) identifier.comparisonType = context.matchType.comparisonType;
+  if (context.matchType.comparisonType) identifier.comparisonTypes = [context.matchType.comparisonType];
 
   // Add extra data if any
   const extraData = context.extraData;

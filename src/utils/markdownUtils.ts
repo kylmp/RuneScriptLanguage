@@ -114,7 +114,7 @@ export function appendDebugHover(markdown: MarkdownString, word: ParsedWord, con
     const refCount = Object.values(identifier.references).reduce((count, set) => count + set.size, 0);
     identifierLines.push(`references=${refCount}`);
     identifierLines.push(`language=${identifier.language}`);
-    if (identifier.comparisonType) identifierLines.push(`comparisonType=${identifier.comparisonType}`);
+    if (identifier.comparisonTypes && identifier.comparisonTypes.length > 0) identifierLines.push(`comparisonTypes=${identifier.comparisonTypes}`);
     if (identifier.hideDisplay) identifierLines.push(`hideDisplay=true`);
     markdown.appendMarkdown(`\n\n---\n\n**Identifier**`);
     markdown.appendCodeblock(identifierLines.join('\n'), 'properties');

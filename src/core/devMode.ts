@@ -1,7 +1,6 @@
 import type { OutputChannel, Uri } from "vscode";
 import type { MatchResult } from "../types";
-import { LogLevel, window } from "vscode";
-import { version as packageVersion } from '../../package.json';
+import { LogLevel, extensions, window } from "vscode";
 import { processAllFiles } from "./manager";
 import { getSettingValue, Settings } from "./settings";
 import { appriximateSize, getCacheKeyCount, getTotalReferences } from "../cache/identifierCache";
@@ -38,6 +37,7 @@ interface initializationMetrics {
  * Output channel to write debug/dev messages to
  */
 const outputChannel: OutputChannel = window.createOutputChannel('Runescript');
+const packageVersion = extensions.getExtension('2004scape.runescriptlanguage')?.packageJSON.version;
 
 /**
  * Contains the last rebuild all metrics

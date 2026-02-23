@@ -24,7 +24,7 @@ export function eventAffectsSetting(event: ConfigurationChangeEvent, setting: Se
   return event.affectsConfiguration(getSettingId(setting));
 }
 
-const extensionSettings = {
+const extensionSettings: Record<Settings, Setting<boolean>> = {
   [Settings.ShowDiagnostics]: {
     id: 'runescript.diagnostics.enabled',
     getValue: () => workspace.getConfiguration('runescript').get('diagnostics.enabled', true) as boolean
@@ -37,4 +37,4 @@ const extensionSettings = {
     id: 'runescript.devMode.enabled',
     getValue: () => workspace.getConfiguration('runescript').get('devMode.enabled', false) as boolean
   },
-} satisfies Record<string, Setting<boolean>>;
+};

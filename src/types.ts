@@ -1,4 +1,5 @@
 import type { Uri } from 'vscode';
+import type { Type } from './enum/type';
 import type { HoverDisplayItem } from './enum/hoverDisplayItems';
 import type { SemanticTokenType } from './enum/semanticTokens';
 import type { ConfigVarArgSrc } from './resource/configKeys';
@@ -153,7 +154,7 @@ export interface Identifier {
   /** Boolean indicating if hover text should not display for this identifier */
   hideDisplay?: boolean;
   /** The type of value this identifier is or resolves to during comparison operations */
-  comparisonType?: string;
+  comparisonTypes?: Type[];
 }
 
 /**
@@ -193,7 +194,7 @@ export interface MatchType {
   /** Unique identifier for the match type */
   id: string;
   /** The types which can correspond to a matchtype (ex: [namedobj, obj] are types for the OBJ matchType) */
-  types: string[];
+  types: Type[];
   /** The file types where a matchType can be defined/declared */
   fileTypes?: string[];
   /** Override the color this type will show up as by assigning it to a semantic token type */
@@ -213,7 +214,7 @@ export interface MatchType {
   /** The config settings for the hover display of identifiers of this type */
   hoverConfig?: HoverConfig;
   /** The comparison type that is *always* used for this matchType, if it has multiple possible comparison types such as constants, handle that in the identifier instead */
-  comparisonType?: string;
+  comparisonType?: Type;
   /** Function that is executed after identifiers of this type have been created (allows for more dynamic runtime info with full context to be tied to an identifier) */
   postProcessor?: PostProcessor;
 }

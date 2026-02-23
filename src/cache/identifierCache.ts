@@ -242,4 +242,12 @@ function getFileIdentifiers(uri: Uri): FileIdentifiers | undefined {
   return fileToIdentifierMap.get(uri.fsPath);
 }
 
-export { get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences, getFileIdentifiers };
+function getIdentifiersByMatchId(matchId: string): Identifier[] {
+  const results: Identifier[] = [];
+  for (const identifier of identifierCache.values()) {
+    if (identifier.matchId === matchId) results.push(identifier);
+  }
+  return results;
+}
+
+export { get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences, getFileIdentifiers, getIdentifiersByMatchId };
