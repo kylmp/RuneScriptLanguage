@@ -7,23 +7,24 @@
     "version": "0.3.0",
     "icon": "icons/icon-min.png",
     "engines": {
-        "vscode": "^1.108.0"
+        "vscode": "^1.100.0"
     },
     "categories": [
         "Programming Languages",
         "Snippets"
     ],
-    "main": "./out/runescriptExtension.js",
+    "main": "dist/extension.js",
     "activationEvents": [],
     "scripts": {
-        "clean": "rimraf out",
+        "build": "npm run clean && bun build --outfile dist/extension.js --external vscode src/extension.ts",
+        "clean": "rimraf dist",
         "compile": "npm run clean && tsc -p ./",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile",
         "lint": "eslint \"src/**/*.ts\"",
-        "vscode:prepublish": "npm run lint && npm run compile",
-        "publish": "npx vsce publish",
-        "package": "npx vsce package"
+        "vscode:prepublish": "npm run compile",
+        "package": "npm run clean && vsce package",
+        "publish": "vsce publish"
     },
     "contributes": {
         "languages": [
@@ -576,17 +577,16 @@
         ]
     },
     "devDependencies": {
-        "@types/node": "^25.0.8",
-        "@types/vscode": "^1.108.1",
+        "@types/node": "^22",
+        "@types/vscode": "^1.100.0",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
-        "@typescript-eslint/parser": "^8.53.0", 
+        "@typescript-eslint/parser": "^8.53.0",
         "eslint": "^9.39.2",
         "eslint-plugin-import": "^2.32.0",
         "rimraf": "^6.0.1",
         "typescript": "^5.9.3"
     },
     "dependencies": {
-        "object-sizeof": "^2.6.5",
-        "runescript-parser": "^0.1.3"
+        "object-sizeof": "^2.6.5"
     }
 }

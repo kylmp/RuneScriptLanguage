@@ -2,8 +2,6 @@
 
 <h1>Lost City - RuneScript Language Extension</h1>
 
-[Website](https://2004.lostcity.rs) | [Discord](https://discord.lostcity.rs) | [Forums](https://lostcity.rs) | [Rune-Server](https://www.rune-server.ee/runescape-development/rs2-server/projects/701698-lost-city-225-emulation.html)
-
 <p>A vscode extension that adds RuneScript language support</p>
 
 </div>

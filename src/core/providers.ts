@@ -11,7 +11,7 @@ import { recolProvider } from "../provider/color/recolorProvider";
 import { signatureHelpProvider, signatureMetadata } from "../provider/signatureHelp/runescriptSignatureHelpProvider";
 import { configHelpProvider, configMetadata } from "../provider/signatureHelp/configSignatureHelpProvider";
 import { semanticTokensLegend, semanticTokensProvider } from "../provider/semanticTokensProvider";
-import { languageIds } from "../runescriptExtension";
+import { languageIds } from "../extension";
 import { mapCodelensProvider } from "../provider/mapCodelensProvider";
 
 export function registerProviders(context: ExtensionContext) {
