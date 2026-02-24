@@ -22,13 +22,16 @@
             "patterns": [
                 {
                     "comment": "Constant declaration",
-                    "match": "(\\^.+)\\s*=\\s*(.+)",
+                    "match": "^(\\^.+?)\\s*=\\s*(.*?)(\\s*//.*)?$",
                     "captures": {
                         "1": {
                             "name": "variable.name.constants.key"
                         },
                         "2": {
                             "name": "constant.numeric.constants"
+                        },
+                        "3": {
+                            "name": "comment.line"
                         }
                     }
                 }
