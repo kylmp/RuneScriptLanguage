@@ -30,7 +30,7 @@ export function decodeReferenceToRange(encodedValue: string): Range | undefined 
   }
   const startPosition = new Position(Number(split[0]), Number(split[1]));
   const wordLength = Number(split[2]) - Number(split[1]);
-  return new Range(startPosition, startPosition.translate(0, wordLength));
+  return new Range(startPosition, startPosition.translate(0, wordLength + 1));
 }
 
 export function getFullName(iden: Identifier): string {
