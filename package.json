@@ -4,18 +4,27 @@
     "publisher": "2004scape",
     "repository": "https://github.com/LostCityRS/RuneScriptLanguage",
     "description": "Syntax highlighting for RuneScript.",
-    "version": "0.2.4",
+    "version": "0.3.0",
     "icon": "icons/icon-min.png",
     "engines": {
-        "vscode": "^1.75.0"
+        "vscode": "^1.108.0"
     },
     "categories": [
         "Programming Languages",
         "Snippets"
     ],
-    "main": "./client/runescript-language.js",
-    "activationEvents": [
-    ],
+    "main": "./out/runescriptExtension.js",
+    "activationEvents": [],
+    "scripts": {
+        "clean": "rimraf out",
+        "compile": "npm run clean && tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile",
+        "lint": "eslint \"src/**/*.ts\"",
+        "vscode:prepublish": "npm run lint && npm run compile",
+        "publish": "npx vsce publish",
+        "package": "npx vsce package"
+    },
     "contributes": {
         "languages": [
             {
@@ -539,11 +548,45 @@
                 "path": "./snippets/snippets.json"
             }
         ],
+        "configuration": {
+            "title": "Runescript",
+            "properties": {
+                "runescript.hover.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable/disable displaying hover information on mouseover."
+                },
+                "runescript.diagnostics.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable/disable diagnostics from the RuneScript extension."
+                },
+                "runescript.devMode.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable/disable developer mode: highlight all matches, show detailed hover info, write data to the runescript output channel."
+                }
+            }
+        },
         "commands": [
             {
                 "command": "RuneScriptLanguage.rebuildCache",
                 "title": "Runescript: Rebuild Workspace Cache"
             }
         ]
+    },
+    "devDependencies": {
+        "@types/node": "^25.0.8",
+        "@types/vscode": "^1.108.1",
+        "@typescript-eslint/eslint-plugin": "^8.53.0",
+        "@typescript-eslint/parser": "^8.53.0", 
+        "eslint": "^9.39.2",
+        "eslint-plugin-import": "^2.32.0",
+        "rimraf": "^6.0.1",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "object-sizeof": "^2.6.5",
+        "runescript-parser": "^0.1.3"
     }
 }
