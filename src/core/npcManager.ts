@@ -136,19 +136,16 @@ function formatTimerHint(ticks: number): string {
 }
 
 function formatRangeHint(rangeValue: number, rangeKey: string, maxrangeValue: number): string {
-  let tiles: number;
-  if (rangeKey === 'wanderrange' || rangeKey === 'huntrange') {
-    tiles = rangeValue;
-  } else if (rangeKey === 'attackrange') {
-    tiles = maxrangeValue + rangeValue;
-  } else {
-    tiles = rangeValue + 1;
-  }
+  const tiles = rangeValue;
   const tileLabel = tiles === 1 ? 'tile' : 'tiles';
   const zonesTimes10 = Math.round((tiles / 8) * 10);
   const zones = zonesTimes10 / 10;
   const zonesText = (zonesTimes10 % 10 === 0) ? zones.toString() : zones.toFixed(1);
   const zoneLabel = zones === 1 ? 'zone' : 'zones';
+  if (rangeKey === 'attackrange') {
+    const inRange = maxrangeValue + rangeValue;
+    return `${tiles} ${tileLabel} (${zonesText} ${zoneLabel}, npc_inrange: ${inRange})`;
+  }
   return `${tiles} ${tileLabel} (${zonesText} ${zoneLabel})`;
 }
 
