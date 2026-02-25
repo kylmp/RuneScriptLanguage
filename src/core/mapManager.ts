@@ -373,11 +373,11 @@ function formatMapTile(entry: MapTileEntry): string {
   if (entry.flags.flags !== undefined) {
     parts.push(`flags: ${formatMapFlags(entry.flags.flags)}`);
   }
-  if (entry.flags.underlay !== undefined) {
-    parts.push(`underlay: ${formatFloName(entry.flags.underlay)}`);
-  }
   if (entry.flags.overlay) {
     parts.push(`overlay: ${formatOverlay(entry.flags.overlay)}`);
+  }
+  if (entry.flags.underlay !== undefined) {
+    parts.push(`underlay: ${formatFloName(entry.flags.underlay)}`);
   }
   return `MAP: ${parts.join(', ')}`;
 }

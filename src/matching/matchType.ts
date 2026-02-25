@@ -98,7 +98,7 @@ export const OBJ: MatchType = defineMatchType({
 export const INV: MatchType = defineMatchType({
   id: 'INV', types: [Type.Inv], fileTypes: ['inv'], cache: true, allowRename: true, comparisonType: Type.Inv,
   hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO, CODEBLOCK], language: 'invconfig', configInclusions: ['scope', 'size'] },
-  semanticTokenConfig: { declaration: SemanticTokenType.Function, reference: SemanticTokenType.Property },
+  semanticTokenConfig: { declaration: SemanticTokenType.Function },
 });
 
 export const ENUM: MatchType = defineMatchType({
