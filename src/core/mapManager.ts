@@ -312,7 +312,7 @@ function formatEntry(entry: MapEntry): string {
       const type = entry.extras[0];
       const rotation = entry.extras[1];
       const extraText = (type !== undefined || rotation !== undefined)
-        ? `, type: ${type ?? 'n/a'}, rotation: ${rotation ?? 'n/a'}`
+        ? `, type: ${type ?? 'n/a'}, rotation: ${rotation ?? '0'}`
         : '';
       return `LOC: ${name} (coordinates: ${coord}${extraText})`;
     }
