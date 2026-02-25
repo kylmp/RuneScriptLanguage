@@ -1,6 +1,6 @@
 import { ConfigVarArgSrc, learnConfigKey, getConfigData } from "../../resource/configKeys";
 import type { MatchContext, Matcher, Identifier, ConfigLineData } from '../../types';
-import { CONFIG_KEY, SKIP, getMatchTypeById } from "../matchType";
+import { COMPONENT, CONFIG_KEY, GLOBAL_VAR, OBJ, SKIP, getMatchTypeById } from "../matchType";
 import { reference } from "../../utils/matchUtils";
 import { dataTypeToMatchId } from "../../resource/dataTypeToMatchId";
 import { getBlockScopeIdentifier, getByLineIndex } from '../../cache/activeFileCache';
@@ -27,6 +27,16 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
   // Get the configData from the configKeys static object [defined in configKeys.ts]
   const configKey = context.word.configKey;
   const paramIndex = context.word.paramIndex;
+  if (context.file.type === 'if' && isInterfaceScriptOpKey(configKey)) {
+    const opcodeName = getConfigParamWord(context, configKey, 0);
+    const matchType = opcodeName ? resolveScriptOpMatchType(opcodeName, paramIndex) : undefined;
+    if (matchType) {
+      reference(matchType, context);
+      return { key: configKey, params: [], index: context.word.index };
+    }
+    reference(SKIP, context);
+    return undefined;
+  }
   const configData = getConfigData(configKey, context.file.type);
   if (!configData || (configData.ignoreValues ?? []).includes(context.word.value)) {
     reference(SKIP, context);
@@ -64,3 +74,30 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
 }
 
 export const configMatcher: Matcher = { priority: 10000, fn: configMatcherFn };
+
+function isInterfaceScriptOpKey(key: string): boolean {
+  return /^script\d+op\d+$/.test(key);
+}
+
+function getConfigParamWord(context: MatchContext, configKey: string, index: number): string | undefined {
+  const word = context.words.find(entry => entry.configKey === configKey && entry.paramIndex === index);
+  return word?.value;
+}
+
+function resolveScriptOpMatchType(opcodeName: string, paramIndex: number) {
+  switch (opcodeName.toLowerCase()) {
+    case 'inv_count':
+    case 'inv_contains':
+      if (paramIndex === 1) return COMPONENT;
+      if (paramIndex === 2) return OBJ;
+      return undefined;
+    case 'pushvar':
+      return paramIndex === 1 ? GLOBAL_VAR : undefined;
+    case 'testbit':
+      return paramIndex === 1 ? GLOBAL_VAR : undefined;
+    case 'push_varbit':
+      return paramIndex === 1 ? GLOBAL_VAR : undefined;
+    default:
+      return undefined;
+  }
+}

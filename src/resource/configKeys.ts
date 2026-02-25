@@ -53,7 +53,7 @@ const regexConfigKeys: Map<string, RegexConfigData[]> = groupByFileType([
   { regex: /stock\d+/, params: ['obj', 'int', 'int'], fileTypes: ["inv"] },
   { regex: /count\d+/, params: ['obj', 'int'], fileTypes: ["obj"] },
   { regex: /frame\d+/, params: ['frame'], fileTypes: ["seq"] },
-  { regex: /^layer$/, params: ['component'], fileTypes: ["if"] },
+  { regex: /^(layer|overlayer)$/, params: ['component'], fileTypes: ["if"] },
   { regex: /(model|head|womanwear|manwear|womanhead|manhead|activemodel)\d*/, params: ['ob2'], fileTypes:['npc', 'loc', 'obj', 'spotanim', 'if', 'idk'] },
   { regex: /\w*anim\w*/, params: ['seq'], fileTypes: ["loc", "npc", "if", "spotanim"] },
   { regex: /replaceheldleft|replaceheldright/, params: ['obj'], fileTypes: ["seq"], ignoreValues: ["hide"] },
