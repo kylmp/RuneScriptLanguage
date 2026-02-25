@@ -4,6 +4,7 @@ import { Diagnostic, DiagnosticSeverity } from "vscode";
 import { RunescriptDiagnostic } from "./RunescriptDiagnostic";
 import { fileNamePostProcessor } from "../resource/postProcessors";
 import { exists as projectFileExists } from '../cache/projectFilesCache';
+import { MAPFILE } from "../matching/matchType";
 
 export class UnknownFileDiagnostic extends RunescriptDiagnostic {
   // Tempoary holds file name between check() and create() calls
@@ -51,5 +52,11 @@ export class UnknownFileDiagnostic extends RunescriptDiagnostic {
 }
 
 function resultToFileKey(result: MatchResult) {
-  return `${result.word}.${(result.context.matchType.fileTypes || [])[0] ?? 'rs2'}`;
+  const fileType = (result.context.matchType.fileTypes || [])[0] ?? 'rs2';
+  if (result.context.matchType.id === MAPFILE.id) {
+    const first = result.word.charAt(0).toLowerCase();
+    const value = first === 'l' ? `m${result.word.substring(1)}` : result.word;
+    return `${value}.${fileType}`;
+  }
+  return `${result.word}.${fileType}`;
 }

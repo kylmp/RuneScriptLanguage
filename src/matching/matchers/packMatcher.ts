@@ -1,7 +1,8 @@
 import type { MatchContext, MatchType, Matcher } from '../../types';
 import { reference } from "../../utils/matchUtils";
 import { dataTypeToMatchId } from "../../resource/dataTypeToMatchId";
-import { COMPONENT, GLOBAL_VAR, SKIP, UNKNOWN, getMatchTypeById } from "../matchType";
+import { COMPONENT, GLOBAL_VAR, MAPFILE, SKIP, UNKNOWN, getMatchTypeById } from "../matchType";
+import { isMapFileName } from "./mapFileMatcher";
 
 /**
 * Looks for matches in pack files
@@ -29,7 +30,12 @@ function packMatcherFn(context: MatchContext): void {
     } else {
       match = getMatchTypeById(dataTypeToMatchId(context.file.name)) ?? SKIP;
     }
-    if (match.id !== SKIP.id && match.id !== UNKNOWN.id) {
+    if (match.id === SKIP.id || match.id === UNKNOWN.id) {
+      if (isMapFileName(context.word.value)) {
+        match = MAPFILE;
+      }
+    }
+    if (match.id !== SKIP.id && match.id !== UNKNOWN.id && match.id !== MAPFILE.id) {
       context.packId = context.words[0].value;
     }
     reference(match, context);

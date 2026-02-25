@@ -145,6 +145,12 @@ export const COMMAND: MatchType = defineMatchType({
   postProcessor: commandPostProcessor
 });
 
+export const MAPFILE: MatchType = defineMatchType({
+  id: 'MAPFILE', types: [], fileTypes: ['jm2'], cache: true, allowRename: false, referenceOnly: true,
+  hoverConfig: { referenceItems: [TITLE, INFO] },
+  postProcessor: fileNamePostProcessor
+});
+
 export const SYNTH: MatchType = defineMatchType({
   id: 'SYNTH', types: [Type.Synth], fileTypes: ['synth'], cache: true, allowRename: true, referenceOnly: true, renameFile: true, comparisonType: Type.Synth,
   hoverConfig: { referenceItems: [TITLE, INFO] },

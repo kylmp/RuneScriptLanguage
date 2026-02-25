@@ -23,6 +23,7 @@ import { booleanMatcher } from './matchers/booleanMatcher';
 import { get as getIdentifier } from '../cache/identifierCache';
 import { Type } from '../enum/type';
 import { matchFromOperators } from './operatorMatching';
+import { mapFileMatcher } from './matchers/mapFileMatcher';
 
 export const enum Engine {
   Config = 'config',
@@ -44,6 +45,7 @@ const engines = {
       configDeclarationMatcher,
       columnDeclarationMatcher,
       constDeclarationMatcher,
+      mapFileMatcher,
     ].slice().sort((a, b) => a.priority - b.priority),
   },
   [Engine.Runescript]: {
@@ -59,6 +61,7 @@ const engines = {
       triggerMatcher,
       switchCaseMatcher,
       parametersMatcher,
+      mapFileMatcher,
       keywordTypeMatcher,
       booleanMatcher,
     ].slice().sort((a, b) => a.priority - b.priority),
