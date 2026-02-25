@@ -59,6 +59,29 @@ export const renameProvider: RenameProvider = {
   }
 }
 
+export async function renameInterfaceFromFileRename(oldUri: Uri, newUri: Uri): Promise<void> {
+  if (!oldUri.fsPath.endsWith('.if') || !newUri.fsPath.endsWith('.if')) return;
+  const oldName = getInterfaceNameFromUri(oldUri);
+  const newName = getInterfaceNameFromUri(newUri);
+  if (!oldName || !newName || oldName === newName) return;
+  const edits = await buildInterfaceRenameEdits(oldName, newName, true);
+  if (edits) {
+    await workspace.applyEdit(edits);
+  }
+}
+
+export async function renameReferenceOnlyByName(oldName: string, newName: string, matchType: MatchType): Promise<void> {
+  if (!oldName || !newName || oldName === newName) return;
+  const existing = getIdentifier(newName, matchType);
+  const oldIdentifier = getIdentifier(oldName, matchType);
+  if (!oldIdentifier) return;
+  if (existing && existing.cacheKey !== oldIdentifier.cacheKey) {
+    throw new Error('Target name already exists.');
+  }
+  const edits = renameReferences(oldIdentifier, newName);
+  await workspace.applyEdit(edits);
+}
+
 // Decode all the references for the identifier into an array of vscode ranges,
 // then use that to rename all of the references to the newName
 function renameReferences(identifier: Identifier | undefined, newName: string): WorkspaceEdit {
@@ -221,4 +244,48 @@ async function renameInterfaceFiles(oldName: string, newName: string): Promise<v
     }
     await workspace.fs.rename(oldUri, newUri);
   }
+}
+
+function getInterfaceNameFromUri(uri: Uri): string | undefined {
+  const fileName = uri.fsPath.split(/[/\\]/).pop() ?? '';
+  const parts = fileName.split('.');
+  if (parts.length < 2) return undefined;
+  if (parts[parts.length - 1] !== 'if') return undefined;
+  return parts.slice(0, -1).join('.');
+}
+
+async function buildInterfaceRenameEdits(oldInterfaceName: string, newInterfaceName: string, skipFileRename: boolean): Promise<WorkspaceEdit | undefined> {
+  const existingInterface = getIdentifier(newInterfaceName, INTERFACE);
+  const oldIdentifier = getIdentifier(oldInterfaceName, INTERFACE);
+  if (existingInterface && existingInterface.cacheKey !== oldIdentifier?.cacheKey) {
+    throw new Error('Target name already exists.');
+  }
+
+  const componentIdentifiers = getIdentifiersByMatchId(COMPONENT.id)
+    .filter(iden => getFullName(iden).startsWith(`${oldInterfaceName}:`));
+
+  const componentIdSet = new Set(componentIdentifiers.map(iden => iden.cacheKey));
+  for (const iden of componentIdentifiers) {
+    const fullName = getFullName(iden);
+    const suffix = fullName.substring(oldInterfaceName.length + 1);
+    const target = `${newInterfaceName}:${suffix}`;
+    const existing = getIdentifier(target, COMPONENT);
+    if (existing && !componentIdSet.has(existing.cacheKey)) {
+      throw new Error('Target name already exists.');
+    }
+  }
+
+  if (!skipFileRename) {
+    await renameInterfaceFiles(oldInterfaceName, newInterfaceName);
+  }
+
+  const edits = new WorkspaceEdit();
+  if (oldIdentifier) {
+    addRenameReferences(edits, oldIdentifier, newInterfaceName);
+  }
+  const docCache = new Map<string, TextDocument>();
+  for (const iden of componentIdentifiers) {
+    await addComponentInterfacePrefixRename(edits, iden, oldInterfaceName, newInterfaceName, docCache);
+  }
+  return edits;
 }

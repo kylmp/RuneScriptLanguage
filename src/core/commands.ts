@@ -1,10 +1,13 @@
 import type { ExtensionContext, QuickPickItem } from 'vscode';
-import { commands, ExtensionMode, Position, Range, Selection, StatusBarAlignment, TextEditorRevealType, window, workspace } from 'vscode';
+import { commands, ExtensionMode, Position, Range, Selection, StatusBarAlignment, TextEditorRevealType, Uri, window, workspace } from 'vscode';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { getCacheKeys, serializeCache } from '../cache/identifierCache';
 import { processAllFiles } from './manager';
 import { showIdentifierLookupView } from '../webview/identifierLookupView';
+import { renameInterfaceFromFileRename, renameReferenceOnlyByName } from '../provider/renameProvider';
+import { MIDI, MODEL, SYNTH } from '../matching/matchType';
+import { LOC_MODEL_REGEX } from '../enum/regex';
 
 /**
  * The interface for registering a new command. 
@@ -67,6 +70,10 @@ export const extensionCommands: Record<string, Command> = {
   jumpToMapSection: {
     id: 'RuneScriptLanguage.jumpToMapSection',
     command: jumpToMapSection
+  },
+  handleInterfaceFileRename: {
+    id: 'RuneScriptLanguage.handleInterfaceFileRename',
+    command: handleInterfaceFileRename
   }
 };
 
@@ -94,6 +101,69 @@ async function jumpToMapSection(line?: number) {
   const position = new Position(line, 0);
   editor.selection = new Selection(position, position);
   editor.revealRange(new Range(position, position), TextEditorRevealType.AtTop);
+}
+
+async function handleInterfaceFileRename(oldUri?: Uri, newUri?: Uri) {
+  if (!oldUri || !newUri) return;
+  try {
+    const oldExt = getExtension(oldUri);
+    const newExt = getExtension(newUri);
+    if (!oldExt || oldExt !== newExt) return;
+    let didRun = false;
+    if (oldExt === 'if') {
+      await renameInterfaceFromFileRename(oldUri, newUri);
+      didRun = true;
+    }
+    else if (oldExt === 'synth') {
+      await renameReferenceOnlyByName(getBaseName(oldUri), getBaseName(newUri), SYNTH);
+      didRun = true;
+    }
+    else if (oldExt === 'mid') {
+      await renameReferenceOnlyByName(getBaseName(oldUri), getBaseName(newUri), MIDI);
+      didRun = true;
+    }
+    else if (oldExt === 'ob2') {
+      const oldName = normalizeModelName(getBaseName(oldUri));
+      const newName = normalizeModelName(getBaseName(newUri));
+      await renameReferenceOnlyByName(oldName, newName, MODEL);
+      didRun = true;
+    }
+    if (didRun) {
+      await saveDirtyDocuments();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    window.showErrorMessage(`Rename update failed: ${message}`);
+  }
+}
+
+function getExtension(uri: Uri): string | undefined {
+  const fileName = uri.fsPath.split(/[/\\]/).pop() ?? '';
+  const parts = fileName.split('.');
+  if (parts.length < 2) return undefined;
+  return parts[parts.length - 1];
+}
+
+function getBaseName(uri: Uri): string {
+  const fileName = uri.fsPath.split(/[/\\]/).pop() ?? '';
+  const parts = fileName.split('.');
+  if (parts.length < 2) return fileName;
+  return parts.slice(0, -1).join('.');
+}
+
+function normalizeModelName(name: string): string {
+  if (!name) return name;
+  if (LOC_MODEL_REGEX.test(name)) {
+    const lastUnderscore = name.lastIndexOf('_');
+    if (lastUnderscore > 0) return name.slice(0, lastUnderscore);
+  }
+  return name;
+}
+
+async function saveDirtyDocuments(): Promise<void> {
+  const dirty = workspace.textDocuments.filter(doc => doc.isDirty);
+  if (dirty.length === 0) return;
+  await Promise.all(dirty.map(doc => doc.save()));
 }
 
 interface DebugMenuItem extends QuickPickItem {

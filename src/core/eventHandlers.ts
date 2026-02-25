@@ -1,5 +1,6 @@
-import type { ConfigurationChangeEvent, ExtensionContext, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextEditor, Uri } from "vscode";
-import { window, workspace } from "vscode";
+import type { ConfigurationChangeEvent, ExtensionContext, FileRenameEvent, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextEditor, Uri } from "vscode";
+import { commands, window, workspace } from "vscode";
+import { dirname } from "path";
 import { clearAllDiagnostics, handleFileCreated as handleFileCreatedDiagnostics, handleFileDeleted as handleFileDeletedDiagnostics, handleFileUpdate as handleFileUpdateDiagnostics } from "./diagnostics";
 import { getFileText, isActiveFile, isValidFile } from "../utils/fileUtils";
 import { addUris, removeUris } from "../cache/projectFilesCache";
@@ -26,6 +27,7 @@ export function registerEventHandlers(context: ExtensionContext): void {
   fileWatcher.onDidChange(onChangeFile);
   fileWatcher.onDidCreate(onCreateFile);
   fileWatcher.onDidDelete(onDeleteFile);
+  const filesRenamed = workspace.onDidRenameFiles(onFilesRenamed);
   const activeFileTextChanged = workspace.onDidChangeTextDocument(onActiveFileTextChange);
   const activeDocumentChanged = window.onDidChangeActiveTextEditor(onActiveDocumentChange);
   const settingsChanged = workspace.onDidChangeConfiguration(onSettingsChange);
@@ -33,6 +35,7 @@ export function registerEventHandlers(context: ExtensionContext): void {
   context.subscriptions.push(
     gitBranchWatcher,
     fileWatcher,
+    filesRenamed,
     activeFileTextChanged,
     activeDocumentChanged,
     settingsChanged,
@@ -156,6 +159,21 @@ function onChangeFile(uri: Uri) {
   if (!isValidFile(uri)) return;
   logFileEvent(uri, Events.FileChanged, 'full reparse');
   void updateFileFromUri(uri);
+}
+
+function onFilesRenamed(event: FileRenameEvent) {
+  const supportedExtensions = new Set(['if', 'synth', 'mid', 'ob2']);
+  for (const file of event.files) {
+    if (dirname(file.oldUri.fsPath) !== dirname(file.newUri.fsPath)) {
+      continue;
+    }
+    const oldExt = file.oldUri.fsPath.split('.').pop();
+    const newExt = file.newUri.fsPath.split('.').pop();
+    if (!oldExt || oldExt !== newExt || !supportedExtensions.has(oldExt)) {
+      continue;
+    }
+    void commands.executeCommand('RuneScriptLanguage.handleInterfaceFileRename', file.oldUri, file.newUri);
+  }
 }
 
 function onGitBranchChange() {
