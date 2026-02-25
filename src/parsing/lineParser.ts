@@ -338,6 +338,11 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
   let inConfigValue = false;
 
   let stringStart: number | undefined = nextState.inString ? 0 : undefined;
+  let stringWordStart: number | undefined;
+  let stringWordCallName: string | undefined;
+  let stringWordCallNameIndex: number | undefined;
+  let stringWordParamIndex: number | undefined;
+  let stringHadInterpolation = false;
   const interpStartStack: number[] = [];
   let blockStart: number | undefined = nextState.inBlockComment ? 0 : undefined;
 
@@ -429,16 +434,57 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
           stringRanges.push({ start: stringStart, end: i });
           stringStart = undefined;
         }
+        if (!startState.isConfig && stringWordStart !== undefined && !stringHadInterpolation) {
+          const contentStart = stringWordStart;
+          const contentEnd = i - 1;
+          if (contentEnd >= contentStart) {
+            const value = lineText.slice(contentStart, i);
+            const index = words.length;
+            words.push({
+              value,
+              start: contentStart,
+              end: contentEnd,
+              index,
+              inString: true,
+              inInterpolation: false,
+              parenDepth,
+              braceDepth,
+              callName: stringWordCallName,
+              callNameIndex: stringWordCallNameIndex,
+              paramIndex: stringWordParamIndex,
+              configKey: undefined
+            });
+          }
+        }
         nextState.inString = false;
+        stringWordStart = undefined;
+        stringWordCallName = undefined;
+        stringWordCallNameIndex = undefined;
+        stringWordParamIndex = undefined;
+        stringHadInterpolation = false;
       } else {
         nextState.inString = true;
         stringStart = i;
+        if (!startState.isConfig) {
+          stringWordStart = i + 1;
+          stringHadInterpolation = false;
+          if (parenDepth > 0) {
+            stringWordCallName = callStack[callStack.length - 1];
+            stringWordCallNameIndex = callIndexStack[callIndexStack.length - 1];
+            stringWordParamIndex = paramIndexStack[paramIndexStack.length - 1];
+          } else {
+            stringWordCallName = undefined;
+            stringWordCallNameIndex = undefined;
+            stringWordParamIndex = undefined;
+          }
+        }
       }
       continue;
     }
 
     if (nextState.inString && !nextState.inInterpolationString && ch === '<') {
       finalizeWord(i - 1);
+      if (!startState.isConfig) stringHadInterpolation = true;
       interpStartStack.push(i);
       nextState.interpDepth++;
       interpParenDepthStack.push(parenDepth);

@@ -24,10 +24,12 @@ export const semanticTokensProvider: DocumentSemanticTokensProvider = {
     }
     enabled = false;
     const builder = new SemanticTokensBuilder(semanticTokensLegend);
-    const typesWithSemanticTokenConfig = getAllMatches().filter(match => match.context.matchType.semanticTokenConfig !== undefined)
-    for (const wordMatch of typesWithSemanticTokenConfig) {
+    for (const wordMatch of getAllMatches()) {
       const tokenConfig = wordMatch.context.matchType.semanticTokenConfig;
-      const token = wordMatch.context.declaration ? tokenConfig?.declaration : tokenConfig?.reference;
+      let token = wordMatch.context.declaration ? tokenConfig?.declaration : tokenConfig?.reference;
+      if (!token && wordMatch.context.word.inString && wordMatch.context.matchType.referenceOnly) {
+        token = SemanticTokenType.Property;
+      }
       if (!token) continue;
       const lineNum = wordMatch.context.line.number;
       const start = wordMatch.context.word.start;
