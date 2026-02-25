@@ -1,10 +1,10 @@
 import type { Uri } from "vscode";
-import { LOC, NPC, OBJ } from "../matching/matchType";
+import { FLO, LOC, NPC, OBJ } from "../matching/matchType";
 import { getFileInfo } from "../utils/fileUtils";
 
 const cache: Map<string, Map<string, string>> = new Map();
 
-const cachedTypes: string[] = [NPC.id, OBJ.id, LOC.id];
+const cachedTypes: string[] = [NPC.id, OBJ.id, LOC.id, FLO.id];
 
 export function add(matchTypeId: string, id: string, name: string): void {
   if (cachedTypes.includes(matchTypeId)) {

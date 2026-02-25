@@ -1,6 +1,29 @@
 import { Position, Range } from 'vscode';
 
 export type MapEntryKind = 'loc' | 'npc' | 'obj';
+export type MapSectionKind = MapEntryKind | 'map';
+
+export type MapTileOverlay = {
+  id: number;
+  angle?: number;
+  shape?: number;
+};
+
+export type MapTileFlags = {
+  height?: number;
+  flags?: number;
+  underlay?: number;
+  overlay?: MapTileOverlay;
+};
+
+export type MapTileEntry = {
+  line: number;
+  level: number;
+  x: number;
+  z: number;
+  flags: MapTileFlags;
+  range: Range;
+};
 
 export type MapEntry = {
   kind: MapEntryKind;
@@ -22,6 +45,7 @@ export type MapParseError = {
 
 export type MapParseResult = {
   entries: MapEntry[];
+  mapTiles: MapTileEntry[];
   errors: MapParseError[];
   sections: Array<{ line: number; name: string }>;
 };
@@ -31,9 +55,10 @@ const lineRegex = /^(\s*)(\d+)\s+(\d+)\s+(\d+)\s*:\s*(.+)\s*$/;
 
 export function parseMapFile(lines: string[]): MapParseResult {
   const entries: MapEntry[] = [];
+  const mapTiles: MapTileEntry[] = [];
   const errors: MapParseError[] = [];
   const sections: Array<{ line: number; name: string }> = [];
-  let currentSection: MapEntryKind | undefined;
+  let currentSection: MapSectionKind | undefined;
 
   for (let lineNum = 0; lineNum < lines.length; lineNum++) {
     const line = lines[lineNum] ?? '';
@@ -41,7 +66,7 @@ export function parseMapFile(lines: string[]): MapParseResult {
     if (sectionMatch) {
       const name = sectionMatch[1]?.toLowerCase();
       sections.push({ line: lineNum, name: (sectionMatch[1] ?? '').toUpperCase() });
-      if (name === 'loc' || name === 'npc' || name === 'obj') {
+      if (name === 'loc' || name === 'npc' || name === 'obj' || name === 'map') {
         currentSection = name;
       } else {
         currentSection = undefined;
@@ -69,6 +94,20 @@ export function parseMapFile(lines: string[]): MapParseResult {
 
     const rhs = match[5] ?? '';
     const rhsTrimmed = rhs.trim();
+
+    if (currentSection === 'map') {
+      const flags = parseMapFlags(rhsTrimmed);
+      mapTiles.push({
+        line: lineNum,
+        level,
+        x,
+        z,
+        flags,
+        range: toRange(lineNum, line)
+      });
+      continue;
+    }
+
     const rhsIndex = line.indexOf(rhsTrimmed, leading.length);
     const idMatch = /^(\d+)/.exec(rhsTrimmed);
     const id = parseIntStrict(idMatch?.[1]);
@@ -105,7 +144,46 @@ export function parseMapFile(lines: string[]): MapParseResult {
     });
   }
 
-  return { entries, errors, sections };
+  return { entries, mapTiles, errors, sections };
+}
+
+function parseMapFlags(rhs: string): MapTileFlags {
+  const flags: MapTileFlags = {};
+  if (!rhs) return flags;
+  const tokens = rhs.split(/\s+/).filter(Boolean);
+  for (const token of tokens) {
+    if (token.startsWith('h')) {
+      const value = parseIntStrict(token.substring(1));
+      if (value !== undefined) flags.height = value;
+      continue;
+    }
+    if (token.startsWith('f')) {
+      const value = parseIntStrict(token.substring(1));
+      if (value !== undefined) flags.flags = value;
+      continue;
+    }
+    if (token.startsWith('u')) {
+      const value = parseIntStrict(token.substring(1));
+      if (value !== undefined) flags.underlay = value;
+      continue;
+    }
+    if (token.startsWith('o')) {
+      if (flags.overlay) continue;
+      const rest = token.substring(1);
+      if (!rest) continue;
+      const parts = rest.split(';');
+      const id = parseIntStrict(parts[0]);
+      if (id === undefined) continue;
+      const shape = parseIntStrict(parts[1]);
+      const angle = parseIntStrict(parts[2]);
+      flags.overlay = {
+        id,
+        angle,
+        shape
+      };
+    }
+  }
+  return flags;
 }
 
 function parseIntStrict(value?: string): number | undefined {

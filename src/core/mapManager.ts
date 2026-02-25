@@ -1,8 +1,8 @@
 import { DecorationRangeBehavior, Diagnostic, DiagnosticSeverity, Position, Range, window, Uri } from "vscode";
 import type { DecorationOptions, TextDocument, TextDocumentChangeEvent, TextEditor } from "vscode";
-import { parseMapFile, type MapEntry, type MapParseError, type MapParseResult, type MapEntryKind } from "../parsing/mapParser";
+import { parseMapFile, type MapEntry, type MapParseError, type MapParseResult, type MapSectionKind, type MapTileEntry } from "../parsing/mapParser";
 import { get as getIdName, hasSymbols as hasIdSymbols } from "../cache/idCache";
-import { LOC, NPC, OBJ } from "../matching/matchType";
+import { FLO, LOC, NPC, OBJ } from "../matching/matchType";
 import { getLines } from "../utils/stringUtils";
 import { getByKey as getIdentifierByKey } from "../cache/identifierCache";
 import type { Identifier } from "../types";
@@ -18,6 +18,7 @@ let activeMapFile: string | undefined;
 let activeChunkX: number | undefined;
 let activeChunkZ: number | undefined;
 let entriesByLine = new Map<number, MapEntry>();
+let mapTilesByLine = new Map<number, MapTileEntry>();
 let errorsByLine = new Map<number, MapParseError>();
 let sectionsByLine = new Map<number, string>();
 let pendingEditTimer: NodeJS.Timeout | undefined;
@@ -99,6 +100,26 @@ function applyDiagnostics() {
     diag.source = 'map';
     diagnosticsList.push(diag);
   }
+  if (hasIdSymbols(FLO.id)) {
+    for (const entry of mapTilesByLine.values()) {
+      if (entry.flags.underlay !== undefined) {
+        const name = getIdName(FLO.id, entry.flags.underlay.toString());
+        if (!name) {
+          const diag = new Diagnostic(entry.range, `FLO id ${entry.flags.underlay} not found`, DiagnosticSeverity.Warning);
+          diag.source = 'map';
+          diagnosticsList.push(diag);
+        }
+      }
+      if (entry.flags.overlay) {
+        const name = getIdName(FLO.id, entry.flags.overlay.id.toString());
+        if (!name) {
+          const diag = new Diagnostic(entry.range, `FLO id ${entry.flags.overlay.id} not found`, DiagnosticSeverity.Warning);
+          diag.source = 'map';
+          diagnosticsList.push(diag);
+        }
+      }
+    }
+  }
   setCustomDiagnostics(editor.document.uri, diagnosticsList);
 }
 
@@ -132,6 +153,7 @@ export function clear() {
   activeChunkX = undefined;
   activeChunkZ = undefined;
   entriesByLine = new Map();
+  mapTilesByLine = new Map();
   errorsByLine = new Map();
   sectionsByLine = new Map();
   if (pendingEditTimer) {
@@ -189,12 +211,12 @@ function applyIncrementalParse(document: TextDocument, startLine: number, endLin
 function findSectionBounds(lines: string[], startLine: number, endLine: number): { sectionStart: number; sectionEnd: number } | undefined {
   const headerRegex = /^====\s*(\w+)\s*====\s*$/;
   let sectionStart = -1;
-  let sectionKind: MapEntryKind | undefined;
+  let sectionKind: MapSectionKind | undefined;
   for (let i = Math.min(startLine, lines.length - 1); i >= 0; i--) {
     const match = headerRegex.exec(lines[i] ?? '');
     if (match) {
       const name = match[1]?.toLowerCase();
-      if (name === 'loc' || name === 'npc' || name === 'obj') {
+      if (name === 'loc' || name === 'npc' || name === 'obj' || name === 'map') {
         sectionStart = i;
         sectionKind = name;
       }
@@ -206,7 +228,7 @@ function findSectionBounds(lines: string[], startLine: number, endLine: number):
       const match = headerRegex.exec(lines[i] ?? '');
       if (match) {
         const name = match[1]?.toLowerCase();
-        if (name === 'loc' || name === 'npc' || name === 'obj') {
+        if (name === 'loc' || name === 'npc' || name === 'obj' || name === 'map') {
           sectionStart = i;
           sectionKind = name;
           break;
@@ -230,6 +252,10 @@ function indexResult(result: MapParseResult, lineOffset: number) {
     const line = entry.line + lineOffset;
     entriesByLine.set(line, offsetEntry(entry, lineOffset));
   }
+  for (const tile of result.mapTiles) {
+    const line = tile.line + lineOffset;
+    mapTilesByLine.set(line, offsetMapTile(tile, lineOffset));
+  }
   for (const error of result.errors) {
     const line = error.line + lineOffset;
     errorsByLine.set(line, offsetError(error, lineOffset));
@@ -243,6 +269,7 @@ function indexResult(result: MapParseResult, lineOffset: number) {
 function replaceRange(startLine: number, endLine: number, result: MapParseResult) {
   for (let line = startLine; line <= endLine; line++) {
     entriesByLine.delete(line);
+    mapTilesByLine.delete(line);
     errorsByLine.delete(line);
     sectionsByLine.delete(line);
   }
@@ -255,6 +282,14 @@ function offsetEntry(entry: MapEntry, lineOffset: number): MapEntry {
     line: entry.line + lineOffset,
     range: offsetRange(entry.range, lineOffset),
     idRange: offsetRange(entry.idRange, lineOffset)
+  };
+}
+
+function offsetMapTile(entry: MapTileEntry, lineOffset: number): MapTileEntry {
+  return {
+    ...entry,
+    line: entry.line + lineOffset,
+    range: offsetRange(entry.range, lineOffset)
   };
 }
 
@@ -274,13 +309,25 @@ function offsetRange(range: Range, lineOffset: number): Range {
 }
 
 function buildDecorations(document: TextDocument): DecorationOptions[] {
-  if (!hasIdSymbols(LOC.id) && !hasIdSymbols(NPC.id) && !hasIdSymbols(OBJ.id)) {
-    return [];
-  }
+  const showEntityHints = hasIdSymbols(LOC.id) || hasIdSymbols(NPC.id) || hasIdSymbols(OBJ.id);
   const decorations: DecorationOptions[] = [];
-  for (const [line, entry] of entriesByLine) {
+  if (showEntityHints) {
+    for (const [line, entry] of entriesByLine) {
+      const lineText = document.lineAt(line).text;
+      const label = formatEntry(entry);
+      if (!label) continue;
+      const range = new Range(new Position(line, lineText.length), new Position(line, lineText.length));
+      decorations.push({
+        range,
+        renderOptions: {
+          after: { contentText: label }
+        }
+      });
+    }
+  }
+  for (const [line, entry] of mapTilesByLine) {
     const lineText = document.lineAt(line).text;
-    const label = formatEntry(entry);
+    const label = formatMapTile(entry);
     if (!label) continue;
     const range = new Range(new Position(line, lineText.length), new Position(line, lineText.length));
     decorations.push({
@@ -319,10 +366,73 @@ function formatEntry(entry: MapEntry): string {
   }
 }
 
+function formatMapTile(entry: MapTileEntry): string {
+  const parts: string[] = [];
+  const height = entry.flags.height !== undefined ? entry.flags.height.toString() : 'perlin';
+  parts.push(`height: ${height}`);
+  if (entry.flags.flags !== undefined) {
+    parts.push(`flags: ${formatMapFlags(entry.flags.flags)}`);
+  }
+  if (entry.flags.underlay !== undefined) {
+    parts.push(`underlay: ${formatFloName(entry.flags.underlay)}`);
+  }
+  if (entry.flags.overlay) {
+    parts.push(`overlay: ${formatOverlay(entry.flags.overlay)}`);
+  }
+  return `MAP: ${parts.join(', ')}`;
+}
+
 function resolveName(entry: MapEntry): string {
   const matchId = entry.kind === 'npc' ? NPC.id : entry.kind === 'loc' ? LOC.id : OBJ.id;
   if (!hasIdSymbols(matchId)) return `${entry.id}`;
   return getIdName(matchId, entry.id.toString()) ?? 'Unknown';
+}
+
+function formatFloName(id: number): string {
+  return getIdName(FLO.id, id.toString()) ?? 'Unknown';
+}
+
+function formatOverlay(overlay: { id: number; angle?: number; shape?: number }): string {
+  const name = getIdName(FLO.id, overlay.id.toString()) ?? 'Unknown';
+  const detailParts: string[] = [];
+  if (overlay.shape !== undefined) {
+    detailParts.push(formatOverlayShape(overlay.shape));
+  }
+  if (overlay.angle !== undefined) detailParts.push(`angle ${overlay.angle}`);
+  if (detailParts.length > 0) {
+    return `${name} (${detailParts.join(', ')})`;
+  }
+  return name;
+}
+
+function formatMapFlags(flags: number): string {
+  const names: string[] = [];
+  if ((flags & 0x1) !== 0) names.push('block');
+  if ((flags & 0x2) !== 0) names.push('link below');
+  if ((flags & 0x4) !== 0) names.push('remove roof');
+  if ((flags & 0x8) !== 0) names.push('vis below');
+  if ((flags & 0x10) !== 0) names.push('force high detail');
+  if (names.length === 0) return 'none';
+  if (names.length === 1) return names[0];
+  return `(${names.join(', ')})`;
+}
+
+function formatOverlayShape(shape: number): string {
+  switch (shape) {
+    case 0: return 'plain';
+    case 1: return 'diagonal';
+    case 2: return 'left semi diagonal small';
+    case 3: return 'right semi diagonal small';
+    case 4: return 'left semi diagonal big';
+    case 5: return 'right semi diagonal big';
+    case 6: return 'half square';
+    case 7: return 'corner small';
+    case 8: return 'corner big';
+    case 9: return 'fan small';
+    case 10: return 'fan big';
+    case 11: return 'trapezium';
+    default: return `shape ${shape}`;
+  }
 }
 
 function formatCoord(entry: MapEntry): string {
