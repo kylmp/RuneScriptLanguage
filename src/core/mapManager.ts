@@ -351,17 +351,17 @@ function formatEntry(entry: MapEntry): string {
     case 'obj': {
       const quantity = entry.extras[0];
       const qtyText = quantity !== undefined ? `, quantity: ${quantity}` : '';
-      return `OBJ: ${name} (coordinates: ${coord}${qtyText})`;
+      return `OBJ: ${name} (coord: ${coord}${qtyText})`;
     }
     case 'npc':
-      return `NPC: ${name} (coordinates: ${coord})`;
+      return `NPC: ${name} (coord: ${coord})`;
     case 'loc': {
       const type = entry.extras[0];
       const rotation = entry.extras[1];
       const extraText = (type !== undefined || rotation !== undefined)
-        ? `, type: ${type ?? 'n/a'}, rotation: ${rotation ?? '0'}`
+        ? `, shape: ${formatLocShape(type)}, rotation: ${rotation ?? '0'}`
         : '';
-      return `LOC: ${name} (coordinates: ${coord}${extraText})`;
+      return `LOC: ${name} (coord: ${coord}${extraText})`;
     }
   }
 }
@@ -398,7 +398,7 @@ function formatOverlay(overlay: { id: number; angle?: number; shape?: number }):
   if (overlay.shape !== undefined) {
     detailParts.push(formatOverlayShape(overlay.shape));
   }
-  if (overlay.angle !== undefined) detailParts.push(`angle ${overlay.angle}`);
+  if (overlay.angle !== undefined) detailParts.push(`rotation ${overlay.angle}`);
   if (detailParts.length > 0) {
     return `${name} (${detailParts.join(', ')})`;
   }
@@ -415,6 +415,36 @@ function formatMapFlags(flags: number): string {
   if (names.length === 0) return 'none';
   if (names.length === 1) return names[0];
   return `(${names.join(', ')})`;
+}
+
+function formatLocShape(shape?: number): string {
+  switch (shape) {
+    case 0: return 'wall straight';
+    case 1: return 'wall diagonal corner';
+    case 2: return 'wall l';
+    case 3: return 'wall square corner';
+    case 4: return 'walldecor straight nooffset';
+    case 5: return 'walldecor straight offset';
+    case 6: return 'walldecor diagonal offset';
+    case 7: return 'walldecor diagonal nooffset';
+    case 8: return 'walldecor diagonal both';
+    case 9: return 'wall diagonal';
+    case 10: return 'centrepiece straight';
+    case 11: return 'centrepiece diagonal';
+    case 12: return 'roof straight';
+    case 13: return 'roof diagonal with roofedge';
+    case 14: return 'roof diagonal';
+    case 15: return 'roof l concave';
+    case 16: return 'roof l convex';
+    case 17: return 'roof flat';
+    case 18: return 'roofedge straight';
+    case 19: return 'roofedge diagonal corner';
+    case 20: return 'roofedge l';
+    case 21: return 'roofedge square corner';
+    case 22: return 'ground decor';
+    case undefined: return 'n/a';
+    default: return `${shape}`;
+  }
 }
 
 function formatOverlayShape(shape: number): string {
