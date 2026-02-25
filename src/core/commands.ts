@@ -23,7 +23,7 @@ interface Command {
  */
 export function registerCommands(context: ExtensionContext) {
   Object.values(extensionCommands)
-    .filter(command => context.extensionMode === ExtensionMode.Development || command.debug)
+    .filter(command => context.extensionMode === ExtensionMode.Development || !command.debug)
     .forEach(command => context.subscriptions.push(commands.registerCommand(command.id, command.command)));
   
   if (context.extensionMode === ExtensionMode.Development) {
