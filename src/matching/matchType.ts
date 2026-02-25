@@ -151,11 +151,11 @@ export const SYNTH: MatchType = defineMatchType({
   postProcessor: fileNamePostProcessor
 });
 
-// export const FRAME: MatchType = defineMatchType({
-//   id: 'FRAME', types: ['frame'], fileTypes: ['frame'], cache: true, allowRename: true, referenceOnly: true, renameFile: true,
-//   hoverConfig: { referenceItems: [TITLE, INFO] },
-//   postProcessor: fileNamePostProcessor
-// });
+export const MIDI: MatchType = defineMatchType({
+  id: 'MIDI', types: [Type.Midi], fileTypes: ['mid'], cache: true, allowRename: true, referenceOnly: true, renameFile: true, comparisonType: Type.Midi,
+  hoverConfig: { referenceItems: [TITLE, INFO] },
+  postProcessor: fileNamePostProcessor
+});
 
 export const MODEL: MatchType = defineMatchType({
   id: 'MODEL', types: [Type.Ob2, Type.Model], fileTypes: ['ob2'], cache: true, allowRename: true, referenceOnly: true, renameFile: true,  comparisonType: Type.Model,
