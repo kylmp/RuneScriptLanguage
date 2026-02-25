@@ -4,6 +4,7 @@ import { Position as VsPosition, Range as VsRange, Uri, WorkspaceEdit, workspace
 import { decodeReferenceToRange } from '../utils/cacheUtils';
 import { MODEL } from '../matching/matchType';
 import { getByDocPosition } from '../cache/activeFileCache';
+import { get as getIdentifier } from '../cache/identifierCache';
 
 export const renameProvider: RenameProvider = {
   async prepareRename(document: TextDocument, position: Position): Promise<Range | { range: Range; placeholder: string } | undefined> {
@@ -37,6 +38,11 @@ export const renameProvider: RenameProvider = {
     }
 
     const adjustedNewName = adjustNewName(item.context, newName);
+    const collisionName = resolveRenameTargetName(item.word, adjustedNewName);
+    const existing = getIdentifier(collisionName, item.context.matchType);
+    if (existing && existing.cacheKey !== item.identifier?.cacheKey) {
+      throw new Error('Target name already exists.');
+    }
     await renameFiles(item.context.matchType, item.word, adjustedNewName);
     return renameReferences(item.identifier, item.word, adjustedNewName);
   }
@@ -76,6 +82,14 @@ function adjustNewName(context: MatchContext, newName: string): string {
   return newName;
 }
 
+function resolveRenameTargetName(oldName: string, newName: string): string {
+  if (oldName.includes(':') && !newName.includes(':')) {
+    const prefix = oldName.split(':', 1)[0] ?? '';
+    return prefix ? `${prefix}:${newName}` : newName;
+  }
+  return newName;
+}
+
 async function renameFiles(match: MatchType, oldName: string, newName: string): Promise<void> {
   if (match.renameFile && Array.isArray(match.fileTypes) && match.fileTypes.length > 0) {
     // Find files to rename
@@ -95,6 +109,11 @@ async function renameFiles(match: MatchType, oldName: string, newName: string): 
       const suffix = oldFileName?.startsWith(`${oldName}_`) ? oldFileName!.slice(oldName.length + 1, oldFileName!.lastIndexOf('.')) : '';
       const newFileName = suffix ? `${newName}_${suffix}.${ext}` : `${newName}.${ext}`;
       const newUri = Uri.joinPath(oldUri.with({ path: oldUri.path.replace(/\/[^/]+$/, '') }), newFileName);
+      try {
+        await workspace.fs.stat(newUri);
+        throw new Error('Target name already exists.');
+      } catch {
+      }
       await workspace.fs.rename(oldUri, newUri);
     }
   }
