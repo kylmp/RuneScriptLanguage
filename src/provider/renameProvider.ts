@@ -1,6 +1,6 @@
 import type { Position, Range, RenameProvider, TextDocument } from 'vscode';
 import type { MatchContext, MatchType, Identifier } from '../types';
-import { Uri, WorkspaceEdit, workspace } from 'vscode';
+import { Position as VsPosition, Range as VsRange, Uri, WorkspaceEdit, workspace } from 'vscode';
 import { decodeReferenceToRange } from '../utils/cacheUtils';
 import { MODEL } from '../matching/matchType';
 import { getByDocPosition } from '../cache/activeFileCache';
@@ -8,7 +8,8 @@ import { getByDocPosition } from '../cache/activeFileCache';
 export const renameProvider: RenameProvider = {
   async prepareRename(document: TextDocument, position: Position): Promise<Range | { range: Range; placeholder: string } | undefined> {
     // Get the item from the active document cache
-    const item = getByDocPosition(document, position);
+    const item = getByDocPosition(document, position)
+      ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
     if (!item) {
       throw new Error("Cannot rename");
     }
@@ -22,12 +23,15 @@ export const renameProvider: RenameProvider = {
     if (wordRange) {
       return { range: wordRange, placeholder: item.word };
     }
-    return wordRange;
+    const wordStart = item.context.word.start;
+    const wordEndExclusive = item.context.word.end + 1;
+    return { range: new VsRange(item.context.line.number, wordStart, item.context.line.number, wordEndExclusive), placeholder: item.word };
   },
 
   async provideRenameEdits(document: TextDocument, position: Position, newName: string): Promise<WorkspaceEdit | undefined> {
     // Get the item from the active document cache
-    const item = getByDocPosition(document, position);
+    const item = getByDocPosition(document, position)
+      ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
     if (!item) {
       return undefined;
     }
