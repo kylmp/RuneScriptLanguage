@@ -74,6 +74,11 @@ export const HUNT: MatchType = defineMatchType({
   hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO, CODEBLOCK], language: 'huntconfig', configInclusions: ['type'] },
 });
 
+export const FLO: MatchType = defineMatchType({
+  id: 'FLO', types: [Type.Flo], fileTypes: ['flo'], cache: true, allowRename: true, comparisonType: Type.Flo,
+  hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO], language: 'floconfig' },
+});
+
 export const LOC: MatchType = defineMatchType({
   id: 'LOC', types: [Type.Loc], fileTypes: ['loc'], cache: true, allowRename: true, comparisonType: Type.Loc,
   hoverConfig: { declarationItems: [TITLE, INFO], referenceItems: [TITLE, INFO, CODEBLOCK], language: 'locconfig', configInclusions: ['name', 'desc', 'category'] },

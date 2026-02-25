@@ -4,6 +4,7 @@ export enum Type {
   Boolean = 'boolean',
   Seq = 'seq',
   Hunt = 'hunt',
+  Flo = 'flo',
   Locshape = 'locshape',
   Component = 'component',
   Idk = 'idk',

@@ -1,7 +1,7 @@
 import { CONFIG_DECLARATION_REGEX } from "../../enum/regex";
 import type { MatchContext, Matcher } from "../../types";
 import { declaration } from "../../utils/matchUtils";
-import { COMPONENT, DBROW, DBTABLE, ENUM, GLOBAL_VAR, HUNT, IDK, INV, LOC, MESANIM, NPC, OBJ, PARAM, SEQ, SPOTANIM, STRUCT } from "../matchType";
+import { COMPONENT, DBROW, DBTABLE, ENUM, FLO, GLOBAL_VAR, HUNT, IDK, INV, LOC, MESANIM, NPC, OBJ, PARAM, SEQ, SPOTANIM, STRUCT } from "../matchType";
 
 function configDeclarationMatcherFn(context: MatchContext): void {
   // Check for config file declarations (i.e. declarations with [NAME])
@@ -18,6 +18,7 @@ function configDeclarationMatcherFn(context: MatchContext): void {
       case "dbtable": return declaration(DBTABLE, context);
       case "enum": return declaration(ENUM, context);
       case "hunt": return declaration(HUNT, context);
+      case "flo": return declaration(FLO, context);
       case "inv": return declaration(INV, context);
       case "spotanim": return declaration(SPOTANIM, context);
       case "idk": return declaration(IDK, context);
