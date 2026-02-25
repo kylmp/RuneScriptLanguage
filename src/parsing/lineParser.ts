@@ -143,7 +143,7 @@ export function applyLineChanges(document: TextDocument, startLine: number, endL
   const fileKey = resolveFileKey(document.uri);
   if (!fileKey) return 0;
   if (state.fileKey && state.fileKey !== fileKey) {
-    return 0;
+    return -1;
   }
   if (lineDelta !== 0) {
     shiftLineMap(wordsByLine, startLine, endLine, lineDelta);

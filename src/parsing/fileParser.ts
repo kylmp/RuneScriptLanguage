@@ -2,6 +2,7 @@ import { type TextDocument, type TextDocumentContentChangeEvent, type Uri } from
 import type { ParsedFile } from "../types";
 import { applyLineChanges, getParsedFile, parseLine, resetLineParser } from "./lineParser";
 import { getFileText } from "../utils/fileUtils";
+import { getLines } from "../utils/stringUtils";
 import { logFileParsed } from "../core/devMode";
 
 /**
@@ -39,6 +40,10 @@ export function reparseFileWithChanges(document: TextDocument, changes: TextDocu
     const addedLines = change.text.split(/\r?\n/).length - 1;
     const lineDelta = addedLines - removedLines;
     linesAffected = applyLineChanges(document, startLine, endLine, lineDelta);
+    if (linesAffected < 0) {
+      // Parser state is for a different file; fall back to a full parse.
+      return parseFile(document.uri, getLines(document.getText()), quiet);
+    }
   }
   if (!quiet) logFileParsed(startTime, document.uri, linesAffected);
   return cloneParsedFile();;
