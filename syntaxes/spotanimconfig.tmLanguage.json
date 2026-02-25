@@ -28,7 +28,7 @@
                 {
                     "comment": "[name]",
                     "name": "entity.name.function.spotanimconfig",
-                    "match": "\\[\\w+\\]"
+                    "match": "\\[[A-Za-z0-9_+.:]+\\]"
                 },
                 {
                     "comment": "Config properties",

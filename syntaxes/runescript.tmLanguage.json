@@ -37,17 +37,17 @@
                 {
                     "comment": "Local variables",
                     "name": "variable.other.runescript",
-                    "match": "\\$\\w+"
+                    "match": "\\$[A-Za-z0-9_+.:]+"
                 },
                 {
                     "comment": "Global variables",
                     "name": "variable.other.runescript",
-                    "match": "\\%\\w+"
+                    "match": "\\%[A-Za-z0-9_+.:]+"
                 },
                 {
                     "comment": "Constants",
                     "name": "variable.other.enummember.runescript",
-                    "match": "\\^\\w+"
+                    "match": "\\^[A-Za-z0-9_+.:]+"
                 },
                 {
                     "comment": "Boolean values",
@@ -55,14 +55,24 @@
                     "match": "\\b(true|false)\\b"
                 },
                 {
+                    "comment": "Hex values",
+                    "name": "constant.numeric.runescript",
+                    "match": "\\b0[xX][0-9a-fA-F]+\\b"
+                },
+                {
                     "comment": "Coord values",
                     "name": "constant.numeric.runescript",
                     "match": "\\b(\\d+_){4}\\d+\\b"
                 },
                 {
+                    "comment": "Mapzone values",
+                    "name": "constant.numeric.runescript",
+                    "match": "\\b(\\d+_){2}\\d+\\b"
+                },
+                {
                     "comment": "Numeric values",
                     "name": "constant.numeric.runescript",
-                    "match": "\\b\\d+\\b"
+                    "match": "\\b-?\\d+\\b"
                 }
             ]
         },
@@ -70,7 +80,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.runescript",
-                    "match": "\\b(if|while|for|return|else|case)\\b"
+                    "match": "\\b(if|while|for|return|else|case|default|calc)\\b"
                 },
                 {
                     "name": "keyword.control.runescript",
@@ -91,17 +101,17 @@
                 {
                     "comment": "Proc/label references",
                     "name": "entity.name.function.runescript",
-                    "match": "[~@](\\.)?\\w+"
+                    "match": "[~@](\\.)?[A-Za-z0-9_+.:]+"
                 },
                 {
                     "comment": "Highlight the first half of [trigger,subject] blue",
                     "name": "variable.language.runescript",
-                    "match": "\\[\\w+(?=,)"
+                    "match": "\\[[A-Za-z0-9_+.:]+(?=,)"
                 },
                 {
                     "comment": "Highlight the second half of [trigger,subject] yellow",
                     "name": "entity.name.function.runescript",
-                    "match": "(?<=,)(\\.)?\\w+(:\\w+)?\\]"
+                    "match": "(?<=,)(\\.)?[A-Za-z0-9_+.:]+(:[A-Za-z0-9_+.:]+)?\\]"
                 },
                 {
                     "comment": "Function parameters",
@@ -111,7 +121,7 @@
                 {
                     "comment": "Any other properties",
                     "name": "variable.other.property.runescript",
-                    "match": "[\\w:]+"
+                    "match": "[A-Za-z0-9_+.:]+"
                 }
             ]
         },

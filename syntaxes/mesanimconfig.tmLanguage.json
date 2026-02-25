@@ -28,7 +28,7 @@
                 {
                     "comment": "[name]",
                     "name": "entity.name.function.mesanimconfig",
-                    "match": "\\[\\w+\\]"
+                    "match": "\\[[A-Za-z0-9_+.:]+\\]"
                 },
                 {
                     "comment": "Numeric values",
