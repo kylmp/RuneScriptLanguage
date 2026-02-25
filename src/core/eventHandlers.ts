@@ -15,6 +15,7 @@ import { handleNpcFileClosed, handleNpcFileEdited, handleNpcFileOpened, isNpcFil
 import { handleObjFileClosed, handleObjFileEdited, handleObjFileOpened, isObjFile } from "./objManager";
 import { handleHuntFileClosed, handleHuntFileEdited, handleHuntFileOpened, isHuntFile } from "./huntManager";
 import { handleInvFileClosed, handleInvFileEdited, handleInvFileOpened, isInvFile } from "./invManager";
+import { handleEnumFileClosed, handleEnumFileEdited, handleEnumFileOpened, isEnumFile } from "./enumManager";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
@@ -56,6 +57,7 @@ function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void 
   if (isObjFile(textChangeEvent.document.uri)) handleObjFileEdited(textChangeEvent);
   if (isHuntFile(textChangeEvent.document.uri)) handleHuntFileEdited(textChangeEvent);
   if (isInvFile(textChangeEvent.document.uri)) handleInvFileEdited(textChangeEvent);
+  if (isEnumFile(textChangeEvent.document.uri)) handleEnumFileEdited(textChangeEvent);
   if (!isValidFile(textChangeEvent.document.uri)) return;
 
   pendingDocument = textChangeEvent.document;
@@ -108,6 +110,7 @@ async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<v
     handleObjFileClosed();
     handleHuntFileClosed();
     handleInvFileClosed();
+    handleEnumFileClosed();
     return handleMapFileOpened(editor.document);
   } else {
     handleMapFileClosed();
@@ -131,6 +134,11 @@ async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<v
     handleInvFileOpened(editor.document);
   } else {
     handleInvFileClosed();
+  }
+  if (isEnumFile(editor.document.uri)) {
+    handleEnumFileOpened(editor.document);
+  } else {
+    handleEnumFileClosed();
   }
   if (!isValidFile(editor.document.uri)) return;
   logFileEvent(editor.document.uri, Events.ActiveFileChanged, 'full reparse');

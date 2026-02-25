@@ -21,6 +21,7 @@ import { clear as clearNpc, handleNpcFileOpened, isNpcFile } from "./npcManager"
 import { clear as clearObj, handleObjFileOpened, isObjFile } from "./objManager";
 import { clear as clearHunt, handleHuntFileOpened, isHuntFile } from "./huntManager";
 import { clear as clearInv, handleInvFileOpened, isInvFile } from "./invManager";
+import { clear as clearEnum, handleEnumFileOpened, isEnumFile } from "./enumManager";
 import { getAllMatchTypes } from "../matching/matchType";
 
 export function initializeExtension(context: ExtensionContext) {
@@ -156,6 +157,9 @@ async function rebuildActiveFile(): Promise<void> {
     if (isInvFile(activeFile)) {
       handleInvFileOpened(document);
     }
+    if (isEnumFile(activeFile)) {
+      handleEnumFileOpened(document);
+    }
     const fileText = await getFileText(activeFile);
     void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText));
   }
@@ -174,6 +178,7 @@ export function clearAll() {
   clearObj();
   clearHunt();
   clearInv();
+  clearEnum();
 }
 
 /**

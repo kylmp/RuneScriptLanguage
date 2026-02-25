@@ -48,6 +48,17 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
     reference(SKIP, context);
     return undefined;
   }
+  if (context.file.type === 'enum' && configKey === 'default' && paramIndex === 0) {
+    const iden = getBlockScopeIdentifier(context.line.number);
+    const outputType = iden?.signature?.params?.[1]?.type;
+    if (outputType) {
+      const resolvedMatchType = getMatchTypeById(dataTypeToMatchId(outputType)) ?? SKIP;
+      reference(resolvedMatchType, context);
+      return { key: configKey, params: [outputType], index: context.word.index };
+    }
+    reference(SKIP, context);
+    return undefined;
+  }
   const configData = getConfigData(configKey, context.file.type);
   if (!configData || (configData.ignoreValues ?? []).includes(context.word.value)) {
     reference(SKIP, context);
@@ -67,9 +78,13 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
     // get the param match types from the identifier signature
     const varArgIndex = paramIndex - configData.varArgs.startIndex;
     if (!iden?.signature?.params) return undefined;
-    const configLineData: ConfigLineData = { key: configKey, params: [...configData.params, ...iden.signature.params.map(p => p.type)], index: context.word.index };
+    let signatureParams = iden.signature.params;
+    if (context.file.type === 'enum' && configKey === 'val' && signatureParams[0]?.type === 'autoint') {
+      signatureParams = signatureParams.slice(1);
+    }
+    const configLineData: ConfigLineData = { key: configKey, params: [...configData.params, ...signatureParams.map(p => p.type)], index: context.word.index };
     if (configData.varArgs.idenSrc === ConfigVarArgSrc.FirstParam) configLineData.params[0] = context.words[1].value;
-    const varArgParam = iden.signature.params[varArgIndex];
+    const varArgParam = signatureParams[varArgIndex];
     if (!varArgParam) return configLineData;
     reference(getMatchTypeById(dataTypeToMatchId(varArgParam.type)) ?? SKIP, context);
     return configLineData;
