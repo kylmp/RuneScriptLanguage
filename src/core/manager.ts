@@ -17,6 +17,7 @@ import { findFileExceptionWords } from "../parsing/wordExceptions";
 import { isDevMode, logFileRebuild, rebuildMetrics, registerDevMode, reportRebuildMetrics } from "./devMode";
 import { clear as clearIdCache, clearAll as clearAllIds } from "../cache/idCache";
 import { clear as clearMap, handleMapFileOpened, isMapFile } from "./mapManager";
+import { clear as clearNpc, handleNpcFileOpened, isNpcFile } from "./npcManager";
 import { getAllMatchTypes } from "../matching/matchType";
 
 export function initializeExtension(context: ExtensionContext) {
@@ -136,7 +137,13 @@ async function rebuildFile(uri: Uri, lines: string[], parsedFile: ParsedFile, qu
 async function rebuildActiveFile(): Promise<void> {
   const activeFile = getActiveFile();
   if (activeFile) {
-    if (isMapFile(activeFile)) return handleMapFileOpened(await workspace.openTextDocument(activeFile));
+    if (isMapFile(activeFile)) {
+      return handleMapFileOpened(await workspace.openTextDocument(activeFile));
+    }
+    const document = await workspace.openTextDocument(activeFile);
+    if (isNpcFile(activeFile)) {
+      handleNpcFileOpened(document);
+    }
     const fileText = await getFileText(activeFile);
     void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText));
   }
@@ -151,6 +158,7 @@ export function clearAll() {
   clearActiveFileCache();
   clearAllIds();
   clearMap();
+  clearNpc();
 }
 
 /**

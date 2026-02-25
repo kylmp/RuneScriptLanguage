@@ -10,6 +10,7 @@ import { allFileTypes, clearFile, processAllFiles, queueFileRebuild } from "./ma
 import { parseFile, reparseFileWithChanges } from "../parsing/fileParser";
 import { getFileIdentifiers } from "../cache/identifierCache";
 import { handleMapFileClosed, handleMapFileEdited, handleMapFileOpened, isMapFile } from "./mapManager";
+import { handleNpcFileClosed, handleNpcFileEdited, handleNpcFileOpened, isNpcFile } from "./npcManager";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
@@ -45,6 +46,7 @@ const rebuildWaiters: Array<{ uri: string; version: number; resolve: () => void 
 function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void {
   if (!isActiveFile(textChangeEvent.document.uri)) return;
   if (isMapFile(textChangeEvent.document.uri)) return handleMapFileEdited(textChangeEvent);
+  if (isNpcFile(textChangeEvent.document.uri)) handleNpcFileEdited(textChangeEvent);
   if (!isValidFile(textChangeEvent.document.uri)) return;
 
   pendingDocument = textChangeEvent.document;
@@ -93,9 +95,15 @@ export function waitForActiveFileRebuild(document: TextDocument, version = docum
 async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<void> {
   if (!editor) return;
   if (isMapFile(editor.document.uri)) {
+    handleNpcFileClosed();
     return handleMapFileOpened(editor.document);
   } else {
     handleMapFileClosed();
+  }
+  if (isNpcFile(editor.document.uri)) {
+    handleNpcFileOpened(editor.document);
+  } else {
+    handleNpcFileClosed();
   }
   if (!isValidFile(editor.document.uri)) return;
   logFileEvent(editor.document.uri, Events.ActiveFileChanged, 'full reparse');

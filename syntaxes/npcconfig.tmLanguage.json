@@ -45,7 +45,7 @@
                 {
                     "comment": "Config properties",
                     "name": "entity.name.type.npcconfig",
-                    "match": "^(size|recol[1-6][sd]|resizex|resizey|resizez|resizeh|resizev|wanderrange|maxrange|huntrange|attackrange|hitpoints|attack|strength|defence|magic|ranged|timer|respawnrate|hasalpha|minimap|members|givechase|alwaysontop|ambient|contrast|headicon|turnspeed|active)(?==)"
+                    "match": "^(size|recol[1-6][sd]|resizex|resizey|resizez|resizeh|resizev|wanderrange|maxrange|huntrange|attackrange|hitpoints|attack|strength|defence|magic|ranged|timer|respawnrate|regenrate|hasalpha|minimap|members|givechase|alwaysontop|ambient|contrast|headicon|turnspeed|active)(?==)"
                 },
                 {
                     "comment": "Numeric values",
