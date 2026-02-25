@@ -8,6 +8,17 @@ import { COMPONENT, GLOBAL_VAR, SKIP, UNKNOWN, getMatchTypeById } from "../match
 */
 function packMatcherFn(context: MatchContext): void {
   if (context.file.type === 'pack' && context.word.index === 1) {
+    const eqIndex = context.line.text.indexOf('=');
+    if (eqIndex >= 0) {
+      const value = context.line.text.slice(eqIndex + 1);
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        const leadingOffset = value.indexOf(trimmed);
+        context.word.start = eqIndex + 1 + Math.max(0, leadingOffset);
+        context.word.end = context.word.start + trimmed.length - 1;
+        context.word.value = trimmed;
+      }
+    }
     let match: MatchType;
     if (context.word.value.startsWith("null")) {
       match = SKIP;

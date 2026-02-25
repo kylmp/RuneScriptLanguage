@@ -27,11 +27,11 @@ export function exists(name?: string, uri?: Uri): boolean {
 }
 
 export function removeUris(uris: Uri[]) {
-  uris.map(uri => uri.fsPath).forEach(file => filesInDataSrc.delete(file));
+  uris.map(uri => basename(uri.fsPath)).forEach(file => filesInDataSrc.delete(file));
 }
 
 export function addUris(uris: Uri[]) {
-  uris.map(uri => uri.fsPath).forEach(file => filesInDataSrc.add(file));
+  uris.map(uri => basename(uri.fsPath)).forEach(file => filesInDataSrc.add(file));
 }
 
 export function clear(): void {
