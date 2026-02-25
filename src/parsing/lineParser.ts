@@ -376,9 +376,9 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
     wordConfigKey = undefined;
   };
 
-  const isAlphaNum = (ch: string) => /[A-Za-z0-9_]/.test(ch);
+  const isWordChar = (ch: string) => /[A-Za-z0-9_+\.]/.test(ch);
   const canStartWord = (ch: string, next: string) =>
-    isAlphaNum(ch) || (ch === '.' && isAlphaNum(next));
+    /[A-Za-z0-9_]/.test(ch) || ((ch === '.' || ch === '+') && /[A-Za-z0-9_]/.test(next));
   const addOperator = (op: string, index: number) => {
     operators.push({ token: op, index, parenDepth });
   };
@@ -610,10 +610,10 @@ function parseLineWithState(lineText: string, _lineNum: number, startState: Pars
       continue;
     }
 
-    if (isAlphaNum(ch)) {
+    if (isWordChar(ch)) {
       continue;
     }
-    if (ch === ':' && !wordHasColon && isAlphaNum(next)) {
+    if (ch === ':' && !wordHasColon && /[A-Za-z0-9_]/.test(next)) {
       wordHasColon = true;
       continue;
     }
