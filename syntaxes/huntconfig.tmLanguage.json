@@ -36,6 +36,93 @@
                     "match": "^(rate)(?==)"
                 },
                 {
+                    "comment": "Hunt check_npc values",
+                    "match": "^(check_npc)=(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.npcconfig.value"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt check_obj values",
+                    "match": "^(check_obj)=(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.objconfig.value"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt check_loc values",
+                    "match": "^(check_loc)=(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.locconfig.value"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt check_inv values",
+                    "match": "^(check_inv)=([^,]+),([^,]+),(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.invconfig.value"
+                        },
+                        "3": {
+                            "name": "variable.name.objconfig.value"
+                        },
+                        "4": {
+                            "name": "variable.language.huntconfig"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt check_invparam values",
+                    "match": "^(check_invparam)=([^,]+),([^,]+),(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.invconfig.value"
+                        },
+                        "3": {
+                            "name": "variable.name.paramconfig.value"
+                        },
+                        "4": {
+                            "name": "variable.language.huntconfig"
+                        }
+                    }
+                },
+                {
+                    "comment": "Hunt extracheck_var values",
+                    "match": "^(extracheck_var)=([^,]+),(.+)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.type.huntconfig.key"
+                        },
+                        "2": {
+                            "name": "variable.name.varpconfig.value"
+                        },
+                        "3": {
+                            "name": "variable.language.huntconfig"
+                        }
+                    }
+                },
+                {
                     "comment": "Numeric values",
                     "name": "constant.numeric.huntconfig",
                     "match": "\\b\\d+\\b"
@@ -141,7 +228,7 @@
                 },
                 {
                     "comment": "Hunt find_newmode values",
-                    "match": "^(find_newmode)=(opplayer[1-5]|applayer[1-5]|queue([1-9]|1[0-9]|20))?",
+                    "match": "^(find_newmode)=((op|ap)(player|npc|loc|obj)[1-5]|queue\\d+)?",
                     "captures": {
                         "1": {
                             "name": "entity.name.type.huntconfig.key"

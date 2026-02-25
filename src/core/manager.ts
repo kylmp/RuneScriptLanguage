@@ -19,6 +19,7 @@ import { clear as clearIdCache, clearAll as clearAllIds } from "../cache/idCache
 import { clear as clearMap, handleMapFileOpened, isMapFile } from "./mapManager";
 import { clear as clearNpc, handleNpcFileOpened, isNpcFile } from "./npcManager";
 import { clear as clearObj, handleObjFileOpened, isObjFile } from "./objManager";
+import { clear as clearHunt, handleHuntFileOpened, isHuntFile } from "./huntManager";
 import { getAllMatchTypes } from "../matching/matchType";
 
 export function initializeExtension(context: ExtensionContext) {
@@ -148,6 +149,9 @@ async function rebuildActiveFile(): Promise<void> {
     if (isObjFile(activeFile)) {
       handleObjFileOpened(document);
     }
+    if (isHuntFile(activeFile)) {
+      handleHuntFileOpened(document);
+    }
     const fileText = await getFileText(activeFile);
     void queueFileRebuild(activeFile, fileText, parseFile(activeFile, fileText));
   }
@@ -164,6 +168,7 @@ export function clearAll() {
   clearMap();
   clearNpc();
   clearObj();
+  clearHunt();
 }
 
 /**

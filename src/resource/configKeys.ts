@@ -35,6 +35,11 @@ const configKeys: Record<string, ConfigKeyData> = {
   table: { params: ['dbtable'] },
   check_category: { params: ['category'] },
   check_inv: { params: ['inv', 'namedobj'] },
+  check_npc: { params: ['npc'] },
+  check_obj: { params: ['obj'] },
+  check_loc: { params: ['loc'] },
+  check_invparam: { params: ['inv', 'param'] },
+  extracheck_var: { params: ['var'] },
 
   param: { params: ['param'], varArgs: {startIndex: 1, idenSrc: ConfigVarArgSrc.FirstParam, idenType: PARAM.id}},
   val: { params: [], varArgs: {startIndex: 0, idenSrc: ConfigVarArgSrc.BlockName, idenType: ENUM.id}},

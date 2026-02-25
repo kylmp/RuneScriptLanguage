@@ -12,6 +12,7 @@ import { getFileIdentifiers } from "../cache/identifierCache";
 import { handleMapFileClosed, handleMapFileEdited, handleMapFileOpened, isMapFile } from "./mapManager";
 import { handleNpcFileClosed, handleNpcFileEdited, handleNpcFileOpened, isNpcFile } from "./npcManager";
 import { handleObjFileClosed, handleObjFileEdited, handleObjFileOpened, isObjFile } from "./objManager";
+import { handleHuntFileClosed, handleHuntFileEdited, handleHuntFileOpened, isHuntFile } from "./huntManager";
 
 
 const debounceTimeMs = 150; // debounce time for normal active file text changes
@@ -49,6 +50,7 @@ function onActiveFileTextChange(textChangeEvent: TextDocumentChangeEvent): void 
   if (isMapFile(textChangeEvent.document.uri)) return handleMapFileEdited(textChangeEvent);
   if (isNpcFile(textChangeEvent.document.uri)) handleNpcFileEdited(textChangeEvent);
   if (isObjFile(textChangeEvent.document.uri)) handleObjFileEdited(textChangeEvent);
+  if (isHuntFile(textChangeEvent.document.uri)) handleHuntFileEdited(textChangeEvent);
   if (!isValidFile(textChangeEvent.document.uri)) return;
 
   pendingDocument = textChangeEvent.document;
@@ -99,6 +101,7 @@ async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<v
   if (isMapFile(editor.document.uri)) {
     handleNpcFileClosed();
     handleObjFileClosed();
+    handleHuntFileClosed();
     return handleMapFileOpened(editor.document);
   } else {
     handleMapFileClosed();
@@ -112,6 +115,11 @@ async function onActiveDocumentChange(editor: TextEditor | undefined): Promise<v
     handleObjFileOpened(editor.document);
   } else {
     handleObjFileClosed();
+  }
+  if (isHuntFile(editor.document.uri)) {
+    handleHuntFileOpened(editor.document);
+  } else {
+    handleHuntFileClosed();
   }
   if (!isValidFile(editor.document.uri)) return;
   logFileEvent(editor.document.uri, Events.ActiveFileChanged, 'full reparse');
