@@ -1,7 +1,10 @@
 import type { CancellationToken, DocumentSemanticTokensProvider, TextDocument } from 'vscode';
 import { EventEmitter, SemanticTokensLegend, SemanticTokensBuilder } from 'vscode';
-import { getActiveCacheFile, getAllMatches } from '../cache/activeFileCache';
+import { getActiveCacheFile, getAllMatches, getAllParsedWords } from '../cache/activeFileCache';
 import { SemanticTokenType } from '../enum/semanticTokens';
+import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
+import { getFileInfo } from '../utils/fileUtils';
+import { KEYWORD_REGEX, SWITCH_TYPE_REGEX, TYPE_REGEX } from '../enum/regex';
 
 const tokenTypes = Object.values(SemanticTokenType);
 const tokenTypeIndex = new Map<string, number>(tokenTypes.map((t, i) => [t, i]));
@@ -15,6 +18,15 @@ export const semanticTokensLegend = new SemanticTokensLegend(tokenTypes, tokenMo
 export const semanticTokensProvider: DocumentSemanticTokensProvider = {
   onDidChangeSemanticTokens: tokensChanged.event,
   provideDocumentSemanticTokens(document: TextDocument, _token: CancellationToken) {
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      if (getFileInfo(document.uri).type !== 'rs2') {
+        return new SemanticTokensBuilder(semanticTokensLegend).build();
+      }
+      if (document.uri.fsPath !== getActiveCacheFile()) {
+        return new SemanticTokensBuilder(semanticTokensLegend).build();
+      }
+      return buildCommandCandidateTokens(document);
+    }
     // Only provide tokens for the document the active cache was built for.
     if (document.uri.fsPath !== getActiveCacheFile()) {
       return new SemanticTokensBuilder(semanticTokensLegend).build();
@@ -45,4 +57,25 @@ export const semanticTokensProvider: DocumentSemanticTokensProvider = {
 export function rebuildSemanticTokens(): void {
   enabled = true;
   tokensChanged.fire();
+}
+
+function buildCommandCandidateTokens(document: TextDocument) {
+  const builder = new SemanticTokensBuilder(semanticTokensLegend);
+  const wordsByLine = getAllParsedWords();
+  for (const [lineNum, words] of wordsByLine.entries()) {
+    const lineText = document.lineAt(lineNum).text;
+    for (const word of words) {
+      if (word.inString || word.inInterpolation) continue;
+      if (KEYWORD_REGEX.test(word.value) || TYPE_REGEX.test(word.value) || SWITCH_TYPE_REGEX.test(word.value)) {
+        continue;
+      }
+      const nextNonWhitespace = lineText.slice(word.end + 1).match(/\S/);
+      if (!nextNonWhitespace) continue;
+      const nextIndex = word.end + 1 + nextNonWhitespace.index!;
+      if (lineText.charAt(nextIndex) !== '(') continue;
+      const length = word.end - word.start + 1;
+      builder.push(lineNum, word.start, length, tokenTypeIndex.get(SemanticTokenType.Function)!, 0);
+    }
+  }
+  return builder.build();
 }

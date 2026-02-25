@@ -5,6 +5,7 @@ import { runescriptTrigger } from '../../resource/triggers';
 import { waitForActiveFileRebuild } from '../../core/eventHandlers';
 import { getCallStateAtPosition } from '../../parsing/lineParser';
 import { getCallIdentifier } from '../../cache/activeFileCache';
+import { isAdvancedFeaturesEnabled } from '../../utils/featureAvailability';
 
 export const signatureMetadata: SignatureHelpProviderMetadata = {
   triggerCharacters: ['(', ',', '['],
@@ -13,6 +14,9 @@ export const signatureMetadata: SignatureHelpProviderMetadata = {
 
 export const signatureHelpProvider: SignatureHelpProvider = {
   provideSignatureHelp(document: TextDocument, position: Position) {
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      return undefined;
+    }
     const triggerHelp = getScriptTriggerHelp(document, position);
     if (triggerHelp) {
       return triggerHelp;

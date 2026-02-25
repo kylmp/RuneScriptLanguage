@@ -9,6 +9,7 @@ import { get as getIdentifier, getByKey } from '../cache/identifierCache';
 import { decodeReferenceToRange } from '../utils/cacheUtils';
 import { getFileInfo, getFileName } from '../utils/fileUtils';
 import { getAllMatchTypes } from '../matching/matchType';
+import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
 
 let diagnostics: DiagnosticCollection | undefined;
 
@@ -52,6 +53,10 @@ export function setCustomDiagnostics(uri: Uri, diagnosticsList: Diagnostic[]): v
 
 export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult[]): Promise<void> {
   if (!getSettingValue(Settings.ShowDiagnostics) || !diagnostics) return;
+  if (!isAdvancedFeaturesEnabled(uri)) {
+    clearFileDiagnostics(uri);
+    return;
+  }
   const diagnosticsList: Diagnostic[] = [];
   for (const result of matchResults) {
     // Skip these types as they never have diagnostics

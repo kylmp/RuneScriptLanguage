@@ -4,9 +4,13 @@ import { getByDocPosition } from '../cache/activeFileCache';
 import { decodeReferenceToLocation } from '../utils/cacheUtils';
 import type { Identifier } from '../types';
 import { getIdentifierAtPosition as getIdentifierAtMapPosition, isMapFile } from '../core/mapManager';
+import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
 
 export const gotoDefinitionProvider: DefinitionProvider = {
   async provideDefinition(document: TextDocument, position: Position): Promise<Location | undefined> {
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      return undefined;
+    }
     if (isMapFile(document.uri)) {
       return gotoIdentifier(getIdentifierAtMapPosition(position));
     }

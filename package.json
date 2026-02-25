@@ -26,6 +26,7 @@
         "package": "npm run clean && vsce package",
         "publish": "vsce publish"
     },
+    "keywords": ["runescript"],
     "contributes": {
         "languages": [
             {
@@ -59,6 +60,42 @@
                     "dark": "./icons/cs2.png",
                     "light": "./icons/cs2.png"
                 }
+            },
+            {
+                "id": "lobbyscript",
+                "aliases": [
+                    "LobbyScript",
+                    "Lobbyscript",
+                    "lobbyscript"
+                ],
+                "extensions": [
+                    ".ls2"
+                ],
+                "configuration": "./language-configuration/runescript.language-configuration.json"
+            },
+            {
+                "id": "serverscript",
+                "aliases": [
+                    "ServerScript",
+                    "Serverscript",
+                    "serverscript"
+                ],
+                "extensions": [
+                    ".ss2"
+                ],
+                "configuration": "./language-configuration/runescript.language-configuration.json"
+            },
+            {
+                "id": "globalscript",
+                "aliases": [
+                    "GlobalScript",
+                    "Globalscript",
+                    "globalscript"
+                ],
+                "extensions": [
+                    ".gs2"
+                ],
+                "configuration": "./language-configuration/runescript.language-configuration.json"
             },
             {
                 "id": "objconfig",

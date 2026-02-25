@@ -5,6 +5,7 @@ import { decodeReferenceToRange, getFullName } from '../utils/cacheUtils';
 import { COMPONENT, INTERFACE, MODEL } from '../matching/matchType';
 import { getByDocPosition } from '../cache/activeFileCache';
 import { get as getIdentifier, getIdentifiersByMatchId } from '../cache/identifierCache';
+import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
 
 export const renameProvider: RenameProvider = {
   async prepareRename(document: TextDocument, position: Position): Promise<Range | { range: Range; placeholder: string } | undefined> {
@@ -13,6 +14,9 @@ export const renameProvider: RenameProvider = {
       ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
     if (!item) {
       throw new Error("Cannot rename");
+    }
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      throw new Error("Cannot rename outside of a project");
     }
     if ((item.context.matchType.id !== INTERFACE.id && !item.context.matchType.allowRename) || item.context.matchType.noop) {
       throw new Error(`${item.context.matchType.id} renaming not supported`);
@@ -35,6 +39,9 @@ export const renameProvider: RenameProvider = {
       ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
     if (!item) {
       return undefined;
+    }
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      throw new Error("Cannot rename outside of a project");
     }
 
     const adjustedNewName = adjustNewName(item.context, newName);

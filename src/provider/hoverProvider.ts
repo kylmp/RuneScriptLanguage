@@ -11,11 +11,13 @@ import { isDevMode } from '../core/devMode';
 import { getSettingValue, Settings } from '../core/settings';
 import { getIdentifierAtPosition as getMapIdentifierAtPosition, isMapFile } from '../core/mapManager';
 import { getMatchTypeById } from '../matching/matchType';
+import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
 
 export const hoverProvider = function(context: ExtensionContext): HoverProvider {
   return {
     async provideHover(document: TextDocument, position: Position): Promise<Hover | undefined> {
       if (!getSettingValue(Settings.ShowHover)) return undefined; // Exit early if hover disabled
+      if (!isAdvancedFeaturesEnabled(document.uri)) return undefined;
       const markdown = markdownBase(context);
       if (isMapFile(document.uri)) {
         appendMapHover(markdown, position);

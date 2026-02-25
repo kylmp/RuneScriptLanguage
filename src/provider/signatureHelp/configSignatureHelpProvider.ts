@@ -5,6 +5,7 @@ import { waitForActiveFileRebuild } from '../../core/eventHandlers';
 import { parseLineWithStateSnapshot } from '../../parsing/lineParser';
 import { getFileInfo } from '../../utils/fileUtils';
 import { getConfigLineMatch } from '../../matching/matchers/configMatcher';
+import { isAdvancedFeaturesEnabled } from '../../utils/featureAvailability';
 
 let lastRequestId = 0;
 
@@ -15,6 +16,9 @@ export const configMetadata = {
 
 export const configHelpProvider = {
   async provideSignatureHelp(document: TextDocument, position: Position) {
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      return undefined;
+    }
     // Try to find a config line match for current cursor position to display signature help for
     const requestId = ++lastRequestId;
     await waitForActiveFileRebuild(document);

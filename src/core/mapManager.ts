@@ -1,7 +1,7 @@
 import { DecorationRangeBehavior, Diagnostic, DiagnosticSeverity, Position, Range, window, Uri } from "vscode";
 import type { DecorationOptions, TextDocument, TextDocumentChangeEvent, TextEditor } from "vscode";
 import { parseMapFile, type MapEntry, type MapParseError, type MapParseResult, type MapEntryKind } from "../parsing/mapParser";
-import { get as getIdName } from "../cache/idCache";
+import { get as getIdName, hasSymbols as hasIdSymbols } from "../cache/idCache";
 import { LOC, NPC, OBJ } from "../matching/matchType";
 import { getLines } from "../utils/stringUtils";
 import { getByKey as getIdentifierByKey } from "../cache/identifierCache";
@@ -43,6 +43,7 @@ export function getIdentifierAtPosition(position: Position): Identifier | undefi
   if (position.line !== start.line) return;
   if (position.character < start.character || position.character >= end.character) return;
   const type = entry.kind.toUpperCase();
+  if (!hasIdSymbols(type)) return undefined;
   const name = getIdName(type, String(entry.id));
   if (!name) return undefined;
   return getIdentifierByKey(name + type);
@@ -89,6 +90,9 @@ function applyDiagnostics() {
   const diagnosticsList: Diagnostic[] = [];
   for (const entry of entriesByLine.values()) {
     const matchId = entry.kind === 'npc' ? NPC.id : entry.kind === 'loc' ? LOC.id : OBJ.id;
+    if (!hasIdSymbols(matchId)) {
+      continue;
+    }
     const name = getIdName(matchId, entry.id.toString());
     if (name) continue;
     const diag = new Diagnostic(entry.idRange, `${matchId} id ${entry.id} not found`, DiagnosticSeverity.Warning);
@@ -270,6 +274,9 @@ function offsetRange(range: Range, lineOffset: number): Range {
 }
 
 function buildDecorations(document: TextDocument): DecorationOptions[] {
+  if (!hasIdSymbols(LOC.id) && !hasIdSymbols(NPC.id) && !hasIdSymbols(OBJ.id)) {
+    return [];
+  }
   const decorations: DecorationOptions[] = [];
   for (const [line, entry] of entriesByLine) {
     const lineText = document.lineAt(line).text;
@@ -314,6 +321,7 @@ function formatEntry(entry: MapEntry): string {
 
 function resolveName(entry: MapEntry): string {
   const matchId = entry.kind === 'npc' ? NPC.id : entry.kind === 'loc' ? LOC.id : OBJ.id;
+  if (!hasIdSymbols(matchId)) return `${entry.id}`;
   return getIdName(matchId, entry.id.toString()) ?? 'Unknown';
 }
 

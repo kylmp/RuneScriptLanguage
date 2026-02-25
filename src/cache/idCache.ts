@@ -16,6 +16,10 @@ export function get(matchTypeId: string, id: string): string | undefined {
   return cache.get(matchTypeId)?.get(id);
 }
 
+export function hasSymbols(matchTypeId: string): boolean {
+  return (cache.get(matchTypeId)?.size ?? 0) > 0;
+}
+
 export function clear(uri: Uri): void {
   const fileInfo = getFileInfo(uri);
   if (fileInfo.type === 'pack' && cachedTypes.includes(fileInfo.name.toUpperCase())) {

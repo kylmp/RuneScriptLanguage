@@ -2,11 +2,15 @@ import type { Position, CompletionItem, CancellationToken, CompletionContext, Te
 import { CompletionTriggerKind } from 'vscode';
 import { COMMAND, CONSTANT, GLOBAL_VAR, LABEL, LOCAL_VAR, PROC, TRIGGER } from '../../matching/matchType';
 import { completionByType, completionTypeSelector, completionWithMatchid, doubleBacktickTrigger, searchForMatchType } from './completetionCommon';
+import { isAdvancedFeaturesEnabled } from '../../utils/featureAvailability';
 
 export const completionTriggers = ['$', '^', '%', '~', '@', '`', '>', ',', '[', '(', ' '];
 
 export const completionProvider: CompletionItemProvider<CompletionItem> = {
   async provideCompletionItems(document: TextDocument, position: Position, _cancellationToken: CancellationToken, context: CompletionContext): Promise<CompletionItem[]> {
+    if (!isAdvancedFeaturesEnabled(document.uri)) {
+      return [];
+    }
     if (context.triggerKind === CompletionTriggerKind.TriggerCharacter) {
       if (doubleBacktickTrigger(document, position, context.triggerCharacter)) {
         return searchForMatchType(document, position, COMMAND.id, true);
