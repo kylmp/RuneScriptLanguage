@@ -37,6 +37,17 @@ export function getConfigLineMatch(context: MatchContext): ConfigLineData | unde
     reference(SKIP, context);
     return undefined;
   }
+  if (context.file.type === 'param' && configKey === 'default' && paramIndex === 0) {
+    const iden = getBlockScopeIdentifier(context.line.number);
+    const paramType = iden?.signature?.params?.[0]?.type;
+    if (paramType) {
+      const resolvedMatchType = getMatchTypeById(dataTypeToMatchId(paramType)) ?? SKIP;
+      reference(resolvedMatchType, context);
+      return { key: configKey, params: [paramType], index: context.word.index };
+    }
+    reference(SKIP, context);
+    return undefined;
+  }
   const configData = getConfigData(configKey, context.file.type);
   if (!configData || (configData.ignoreValues ?? []).includes(context.word.value)) {
     reference(SKIP, context);
