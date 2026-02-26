@@ -3,6 +3,7 @@ import type { MatchContext, MatchType, Identifier } from '../types';
 import { Position as VsPosition, Range as VsRange, Uri, WorkspaceEdit, workspace } from 'vscode';
 import { decodeReferenceToRange, getFullName } from '../utils/cacheUtils';
 import { COMPONENT, INTERFACE, MODEL } from '../matching/matchType';
+import { LOC_MODEL_REGEX } from '../enum/regex';
 import { getByDocPosition } from '../cache/activeFileCache';
 import { get as getIdentifier, getIdentifiersByMatchId } from '../cache/identifierCache';
 import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
@@ -55,6 +56,9 @@ export const renameProvider: RenameProvider = {
       throw new Error('Target name already exists.');
     }
     await renameFiles(item.context.matchType, item.word, adjustedNewName);
+    if (item.context.matchType.id === MODEL.id) {
+      return renameModelReferences(item.identifier, adjustedNewName);
+    }
     return renameReferences(item.identifier, adjustedNewName);
   }
 }
@@ -82,6 +86,18 @@ export async function renameReferenceOnlyByName(oldName: string, newName: string
   await workspace.applyEdit(edits);
 }
 
+export async function renameModelReferencesByName(oldName: string, newName: string): Promise<void> {
+  if (!oldName || !newName || oldName === newName) return;
+  const existing = getIdentifier(newName, MODEL);
+  const oldIdentifier = getIdentifier(oldName, MODEL);
+  if (!oldIdentifier) return;
+  if (existing && existing.cacheKey !== oldIdentifier.cacheKey) {
+    throw new Error('Target name already exists.');
+  }
+  const edits = await renameModelReferences(oldIdentifier, newName);
+  await workspace.applyEdit(edits);
+}
+
 // Decode all the references for the identifier into an array of vscode ranges,
 // then use that to rename all of the references to the newName
 function renameReferences(identifier: Identifier | undefined, newName: string): WorkspaceEdit {
@@ -95,6 +111,36 @@ function renameReferences(identifier: Identifier | undefined, newName: string): 
           renameWorkspaceEdits.replace(uri, range, newName);
         }
       });
+    });
+  }
+  return renameWorkspaceEdits;
+}
+
+async function renameModelReferences(identifier: Identifier | undefined, newName: string): Promise<WorkspaceEdit> {
+  const renameWorkspaceEdits = new WorkspaceEdit();
+  if (!identifier?.references) {
+    return renameWorkspaceEdits;
+  }
+  const docCache = new Map<string, TextDocument>();
+  for (const fileKey of Object.keys(identifier.references)) {
+    const uri = Uri.file(fileKey);
+    let doc = docCache.get(fileKey);
+    if (!doc) {
+      doc = await workspace.openTextDocument(uri);
+      docCache.set(fileKey, doc);
+    }
+    identifier.references[fileKey].forEach((encodedReference: string) => {
+      const range = decodeReferenceToRange(encodedReference);
+      if (!range) return;
+      const currentText = doc!.getText(range);
+      let replacement = newName;
+      if (LOC_MODEL_REGEX.test(currentText)) {
+        const lastUnderscore = currentText.lastIndexOf('_');
+        if (lastUnderscore > 0) {
+          replacement = `${newName}${currentText.slice(lastUnderscore)}`;
+        }
+      }
+      renameWorkspaceEdits.replace(uri, range, replacement);
     });
   }
   return renameWorkspaceEdits;

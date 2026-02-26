@@ -5,7 +5,7 @@ import { join } from 'path';
 import { getCacheKeys, serializeCache } from '../cache/identifierCache';
 import { processAllFiles } from './manager';
 import { showIdentifierLookupView } from '../webview/identifierLookupView';
-import { renameInterfaceFromFileRename, renameReferenceOnlyByName } from '../provider/renameProvider';
+import { renameInterfaceFromFileRename, renameModelReferencesByName, renameReferenceOnlyByName } from '../provider/renameProvider';
 import { MIDI, MODEL, SYNTH } from '../matching/matchType';
 import { LOC_MODEL_REGEX } from '../enum/regex';
 
@@ -125,7 +125,7 @@ async function handleInterfaceFileRename(oldUri?: Uri, newUri?: Uri) {
     else if (oldExt === 'ob2') {
       const oldName = normalizeModelName(getBaseName(oldUri));
       const newName = normalizeModelName(getBaseName(newUri));
-      await renameReferenceOnlyByName(oldName, newName, MODEL);
+      await renameModelReferencesByName(oldName, newName);
       didRun = true;
     }
     if (didRun) {
