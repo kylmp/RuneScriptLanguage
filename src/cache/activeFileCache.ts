@@ -5,7 +5,7 @@ import { LOCAL_VAR, QUEUE, SKIP, KEYWORD, TRIGGER, UNKNOWN } from "../matching/m
 import { decodeReferenceToLocation, resolveFileKey, resolveKeyFromIdentifier } from "../utils/cacheUtils";
 import { addReference, buildFromDeclaration } from "../resource/identifierFactory";
 import { findMatchInRange } from "../utils/matchUtils";
-import { LineReferenceCache } from "./class/LineReferenceCache";
+import { LineReferenceCache, type LineReferenceSnapshot } from "./class/LineReferenceCache";
 import { CONFIG_DECLARATION_REGEX, QUEUE_REGEX } from "../enum/regex";
 import { dataTypeToMatchType } from "../resource/dataTypeToMatchId";
 import { isDevMode, logWarning } from "../core/devMode";
@@ -261,6 +261,57 @@ export function clear() {
   newCodeblockFlag = -1;
 }
 
+export function snapshot(): ActiveFileCacheSnapshot {
+  const fileMatchesSnapshot = new Map<number, DataRange<MatchResult>[]>();
+  fileMatches.forEach((ranges, lineNum) => {
+    fileMatchesSnapshot.set(lineNum, [...ranges]);
+  });
+  const localVarSnapshot = new Map<string, Map<string, Identifier>>();
+  localVarCache.forEach((vars, key) => {
+    localVarSnapshot.set(key, new Map(vars));
+  });
+  const switchSnapshot = new Map<number, LineReferenceSnapshot<MatchType>>();
+  switchStmtCache.forEach((cache, key) => {
+    switchSnapshot.set(key, cache.snapshot());
+  });
+  return {
+    file,
+    fileMatches: fileMatchesSnapshot,
+    parsedWords,
+    operatorTokens,
+    stringRanges,
+    interpolationRanges,
+    localVarCache: localVarSnapshot,
+    codeBlockCache: codeBlockCache.snapshot(),
+    switchStmtCache: switchSnapshot,
+    newCodeblockFlag
+  };
+}
+
+export function restore(snapshot: ActiveFileCacheSnapshot): void {
+  file = snapshot.file;
+  fileMatches.clear();
+  snapshot.fileMatches.forEach((ranges, lineNum) => {
+    fileMatches.set(lineNum, ranges);
+  });
+  parsedWords = snapshot.parsedWords;
+  operatorTokens = snapshot.operatorTokens;
+  stringRanges = snapshot.stringRanges;
+  interpolationRanges = snapshot.interpolationRanges;
+  localVarCache.clear();
+  snapshot.localVarCache.forEach((vars, key) => {
+    localVarCache.set(key, vars);
+  });
+  codeBlockCache.restore(snapshot.codeBlockCache);
+  switchStmtCache.clear();
+  snapshot.switchStmtCache.forEach((cacheSnapshot, key) => {
+    const cache = new LineReferenceCache<MatchType>();
+    cache.restore(cacheSnapshot);
+    switchStmtCache.set(key, cache);
+  });
+  newCodeblockFlag = snapshot.newCodeblockFlag;
+}
+
 /**
  * Process a matched word into the active file cache. 
  * Builds additional context essential for some matches to be found.
@@ -412,6 +463,19 @@ export function getLocalVariableNames(lineNum: number): Set<{ name: string, desc
  * When > -1 it signals that the next word is a script identifier (proc, label, etc...). Value is the lineNum.
  */
 let newCodeblockFlag = -1;
+
+export interface ActiveFileCacheSnapshot {
+  file: string;
+  fileMatches: Map<number, DataRange<MatchResult>[]>;
+  parsedWords: Map<number, ParsedWord[]>;
+  operatorTokens: Map<number, OperatorToken[]>;
+  stringRanges: Map<number, TextRange[]>;
+  interpolationRanges: Map<number, TextRange[]>;
+  localVarCache: Map<string, Map<string, Identifier>>;
+  codeBlockCache: LineReferenceSnapshot<MatchResult>;
+  switchStmtCache: Map<number, LineReferenceSnapshot<MatchType>>;
+  newCodeblockFlag: number;
+}
 
 /**
  * Caches the lines that a script identifier is defined on. 

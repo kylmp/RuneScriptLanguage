@@ -7,9 +7,12 @@ import { LOC_MODEL_REGEX } from '../enum/regex';
 import { getByDocPosition } from '../cache/activeFileCache';
 import { get as getIdentifier, getIdentifiersByMatchId } from '../cache/identifierCache';
 import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
+import { registerIdentifierRename, registerRenameUris, registerRenameWorkspaceEdit } from '../core/renameTracking';
+import { waitForActiveFileRebuild } from '../core/eventHandlers';
 
 export const renameProvider: RenameProvider = {
   async prepareRename(document: TextDocument, position: Position): Promise<Range | { range: Range; placeholder: string } | undefined> {
+    await waitForActiveFileRebuildWithTimeout(document);
     // Get the item from the active document cache
     const item = getByDocPosition(document, position)
       ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
@@ -35,6 +38,7 @@ export const renameProvider: RenameProvider = {
   },
 
   async provideRenameEdits(document: TextDocument, position: Position, newName: string): Promise<WorkspaceEdit | undefined> {
+    await waitForActiveFileRebuildWithTimeout(document);
     // Get the item from the active document cache
     const item = getByDocPosition(document, position)
       ?? (position.character > 0 ? getByDocPosition(document, new VsPosition(position.line, position.character - 1)) : undefined);
@@ -47,7 +51,11 @@ export const renameProvider: RenameProvider = {
 
     const adjustedNewName = adjustNewName(item.context, newName);
     if (item.context.matchType.id === INTERFACE.id) {
-      return renameInterface(item, adjustedNewName);
+      const edits = await renameInterface(item, adjustedNewName);
+      if (edits) {
+        registerRenameWorkspaceEdit(edits);
+      }
+      return edits;
     }
 
     const collisionName = resolveRenameTargetName(item.word, adjustedNewName);
@@ -55,12 +63,24 @@ export const renameProvider: RenameProvider = {
     if (existing && existing.cacheKey !== item.identifier?.cacheKey) {
       throw new Error('Target name already exists.');
     }
+    registerIdentifierRename(item.context.matchType, item.word, adjustedNewName);
     await renameFiles(item.context.matchType, item.word, adjustedNewName);
     if (item.context.matchType.id === MODEL.id) {
-      return renameModelReferences(item.identifier, adjustedNewName);
+      const edits = await renameModelReferences(item.identifier, adjustedNewName);
+      registerRenameWorkspaceEdit(edits);
+      return edits;
     }
-    return renameReferences(item.identifier, adjustedNewName);
+    const edits = renameReferences(item.identifier, adjustedNewName);
+    registerRenameWorkspaceEdit(edits);
+    return edits;
   }
+}
+
+async function waitForActiveFileRebuildWithTimeout(document: TextDocument, timeoutMs = 500): Promise<void> {
+  await Promise.race([
+    waitForActiveFileRebuild(document),
+    new Promise<void>(resolve => setTimeout(resolve, timeoutMs))
+  ]);
 }
 
 export async function renameInterfaceFromFileRename(oldUri: Uri, newUri: Uri): Promise<void> {
@@ -68,9 +88,19 @@ export async function renameInterfaceFromFileRename(oldUri: Uri, newUri: Uri): P
   const oldName = getInterfaceNameFromUri(oldUri);
   const newName = getInterfaceNameFromUri(newUri);
   if (!oldName || !newName || oldName === newName) return;
+  registerIdentifierRename(INTERFACE, oldName, newName);
+  const componentIdentifiers = getIdentifiersByMatchId(COMPONENT.id)
+    .filter(iden => getFullName(iden).startsWith(`${oldName}:`));
+  for (const iden of componentIdentifiers) {
+    const fullName = getFullName(iden);
+    const suffix = fullName.substring(oldName.length + 1);
+    const target = `${newName}:${suffix}`;
+    registerIdentifierRename(COMPONENT, fullName, target);
+  }
   const edits = await buildInterfaceRenameEdits(oldName, newName, true);
   if (edits) {
     await workspace.applyEdit(edits);
+    registerRenameWorkspaceEdit(edits);
   }
 }
 
@@ -82,8 +112,10 @@ export async function renameReferenceOnlyByName(oldName: string, newName: string
   if (existing && existing.cacheKey !== oldIdentifier.cacheKey) {
     throw new Error('Target name already exists.');
   }
+  registerIdentifierRename(matchType, oldName, newName);
   const edits = renameReferences(oldIdentifier, newName);
   await workspace.applyEdit(edits);
+  registerRenameWorkspaceEdit(edits);
 }
 
 export async function renameModelReferencesByName(oldName: string, newName: string): Promise<void> {
@@ -94,8 +126,10 @@ export async function renameModelReferencesByName(oldName: string, newName: stri
   if (existing && existing.cacheKey !== oldIdentifier.cacheKey) {
     throw new Error('Target name already exists.');
   }
+  registerIdentifierRename(MODEL, oldName, newName);
   const edits = await renameModelReferences(oldIdentifier, newName);
   await workspace.applyEdit(edits);
+  registerRenameWorkspaceEdit(edits);
 }
 
 // Decode all the references for the identifier into an array of vscode ranges,
@@ -175,6 +209,7 @@ async function renameFiles(match: MatchType, oldName: string, newName: string): 
     // Find files to rename
     let files: Uri[] = [];
     const ext = match.fileTypes[0];
+    const renamedUris: Uri[] = [];
     if (match.id === MODEL.id) {
       files = await workspace.findFiles(`**/${oldName}*.${ext}`) || [];
       const regex = new RegExp(`^(?:${oldName}\\.${ext}|${oldName}_[^/]\\.${ext})$`);
@@ -195,6 +230,10 @@ async function renameFiles(match: MatchType, oldName: string, newName: string): 
       } catch {
       }
       await workspace.fs.rename(oldUri, newUri);
+      renamedUris.push(newUri);
+    }
+    if (renamedUris.length > 0) {
+      registerRenameUris(renamedUris);
     }
   }
 }
@@ -206,6 +245,7 @@ async function renameInterface(item: { identifier?: Identifier; word: string; co
     throw new Error('Target name already exists.');
   }
 
+  registerIdentifierRename(INTERFACE, oldInterfaceName, newInterfaceName);
   const componentIdentifiers = getIdentifiersByMatchId(COMPONENT.id)
     .filter(iden => getFullName(iden).startsWith(`${oldInterfaceName}:`));
 
@@ -218,6 +258,7 @@ async function renameInterface(item: { identifier?: Identifier; word: string; co
     if (existing && !componentIdSet.has(existing.cacheKey)) {
       throw new Error('Target name already exists.');
     }
+    registerIdentifierRename(COMPONENT, fullName, target);
   }
 
   await renameInterfaceFiles(oldInterfaceName, newInterfaceName);
@@ -281,6 +322,7 @@ async function addComponentInterfacePrefixRename(
 
 async function renameInterfaceFiles(oldName: string, newName: string): Promise<void> {
   const files = await workspace.findFiles(`**/${oldName}.if`) || [];
+  const renamedUris: Uri[] = [];
   for (const oldUri of files) {
     const newUri = Uri.joinPath(oldUri.with({ path: oldUri.path.replace(/\/[^/]+$/, '') }), `${newName}.if`);
     try {
@@ -289,6 +331,10 @@ async function renameInterfaceFiles(oldName: string, newName: string): Promise<v
     } catch {
     }
     await workspace.fs.rename(oldUri, newUri);
+    renamedUris.push(newUri);
+  }
+  if (renamedUris.length > 0) {
+    registerRenameUris(renamedUris);
   }
 }
 

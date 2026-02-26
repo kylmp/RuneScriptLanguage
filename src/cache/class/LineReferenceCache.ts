@@ -6,6 +6,11 @@ interface LineReferenceData<T> {
   data: DataRange<T>[]
 }
 
+export interface LineReferenceSnapshot<T> {
+  processed: boolean;
+  data: DataRange<T>[];
+}
+
 /**
  * Line reference cache is expected to be populated in a sequential manner where one data always comes in 
  * assuming lower line number to higher line number (like how the lines are read for a file)
@@ -80,6 +85,20 @@ export class LineReferenceCache<T> {
    */
   clear(): void {
     this.cache = getDefault();
+  }
+
+  snapshot(): LineReferenceSnapshot<T> {
+    return {
+      processed: this.cache.processed,
+      data: [...this.cache.data]
+    };
+  }
+
+  restore(snapshot: LineReferenceSnapshot<T>): void {
+    this.cache = {
+      processed: snapshot.processed,
+      data: [...snapshot.data]
+    };
   }
 }
 

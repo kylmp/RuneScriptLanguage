@@ -1,9 +1,10 @@
 const sizeof = require('object-sizeof');
-import type { Uri } from 'vscode';
+import type { TextEdit, Uri } from 'vscode';
 import type { FileIdentifiers, FileKey, Identifier, IdentifierKey, IdentifierText, MatchContext, MatchType } from '../types';
 import { addReference, buildFromDeclaration, buildFromReference, serializeIdentifier } from '../resource/identifierFactory';
-import { resolveFileKey, resolveIdentifierKey } from '../utils/cacheUtils';
+import { encodeReference, resolveFileKey, resolveIdentifierKey } from '../utils/cacheUtils';
 import { clear as clearCompletionCache, put as putCompletionCache, remove as removeCompletionCache } from './completionCache';
+import { add as addToIdCache } from './idCache';
 
 /**
   * The identifierCache stores all matched identifiers in the workspace
@@ -250,4 +251,104 @@ function getIdentifiersByMatchId(matchId: string): Identifier[] {
   return results;
 }
 
-export { get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences, getFileIdentifiers, getIdentifiersByMatchId };
+function renameIdentifier(oldName: string, matchType: MatchType, newName: string): Identifier | undefined {
+  const oldKey = resolveIdentifierKey(oldName, matchType);
+  const newKey = resolveIdentifierKey(newName, matchType);
+  if (!oldKey || !newKey || oldKey === newKey) return;
+  const identifier = identifierCache.get(oldKey);
+  if (!identifier) return;
+  identifierCache.delete(oldKey);
+  identifier.name = newName;
+  identifier.cacheKey = newKey;
+  identifierCache.set(newKey, identifier);
+  removeCompletionCache(oldName, matchType.id);
+  putCompletionCache(newName, matchType.id);
+  if (identifier.id) {
+    addToIdCache(matchType.id, identifier.id, newName);
+  }
+  const fileKeys = new Set<string>();
+  if (identifier.declaration) {
+    fileKeys.add(identifier.declaration.uri.fsPath);
+  }
+  Object.keys(identifier.references).forEach(fileKey => fileKeys.add(fileKey));
+  fileKeys.forEach(fileKey => {
+    const entry = fileToIdentifierMap.get(fileKey);
+    if (!entry) return;
+    if (entry.declarations.delete(oldKey)) entry.declarations.add(newKey);
+    if (entry.references.delete(oldKey)) entry.references.add(newKey);
+    fileToIdentifierMap.set(fileKey, entry);
+  });
+  return identifier;
+}
+
+type LineEdit = { start: number; end: number; oldLen: number; newLen: number };
+
+function getLineEdits(edits: TextEdit[]): Map<number, LineEdit[]> {
+  const editsByLine = new Map<number, LineEdit[]>();
+  for (const edit of edits) {
+    if (edit.range.start.line !== edit.range.end.line) continue;
+    const line = edit.range.start.line;
+    const start = edit.range.start.character;
+    const end = edit.range.end.character;
+    const oldLen = end - start;
+    const newLen = edit.newText.length;
+    const lineEdits = editsByLine.get(line) ?? [];
+    lineEdits.push({ start, end, oldLen, newLen });
+    editsByLine.set(line, lineEdits);
+  }
+  editsByLine.forEach(list => list.sort((a, b) => a.start - b.start));
+  return editsByLine;
+}
+
+function adjustEncodedReference(encoded: string, lineEdits: Map<number, LineEdit[]>): string | undefined {
+  const split = encoded.split('|');
+  if (split.length !== 3) return undefined;
+  const line = Number(split[0]);
+  const start = Number(split[1]);
+  const end = Number(split[2]);
+  const edits = lineEdits.get(line);
+  if (!edits || edits.length === 0) return encoded;
+  const refStart = start;
+  const refEndExclusive = end + 1;
+  let delta = 0;
+  for (const edit of edits) {
+    if (edit.end <= refStart) {
+      delta += edit.newLen - edit.oldLen;
+      continue;
+    }
+    if (edit.start >= refEndExclusive) {
+      break;
+    }
+    const newStart = edit.start + delta;
+    const newEnd = newStart + edit.newLen - 1;
+    return encodeReference(line, newStart, newEnd);
+  }
+  return encodeReference(line, start + delta, end + delta);
+}
+
+function applyTextEdits(fileKey: string, edits: TextEdit[]): void {
+  const entry = fileToIdentifierMap.get(fileKey);
+  if (!entry) return;
+  const lineEdits = getLineEdits(edits);
+  if (lineEdits.size === 0) return;
+  const keys = new Set<IdentifierKey>([...entry.declarations, ...entry.references]);
+  for (const key of keys) {
+    const iden = identifierCache.get(key);
+    if (!iden) continue;
+    if (iden.declaration?.uri.fsPath === fileKey) {
+      const updated = adjustEncodedReference(iden.declaration.ref, lineEdits);
+      if (updated) iden.declaration.ref = updated;
+    }
+    const refs = iden.references[fileKey];
+    if (refs) {
+      const newRefs = new Set<string>();
+      for (const ref of refs) {
+        const updated = adjustEncodedReference(ref, lineEdits);
+        if (updated) newRefs.add(updated);
+      }
+      iden.references[fileKey] = newRefs;
+    }
+  }
+}
+
+export { get, getByKey, put, putReference, clear, clearFile, serializeCache, getCacheKeys, getCacheKeyCount, appriximateSize, getTotalReferences, getFileIdentifiers, getIdentifiersByMatchId, renameIdentifier, applyTextEdits };

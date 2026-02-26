@@ -10,6 +10,7 @@ import { decodeReferenceToRange } from '../utils/cacheUtils';
 import { getFileInfo, getFileName } from '../utils/fileUtils';
 import { getAllMatchTypes } from '../matching/matchType';
 import { isAdvancedFeaturesEnabled } from '../utils/featureAvailability';
+import { shouldSuppressDiagnostics, shouldSuppressDiagnosticsForKey } from './renameTracking';
 
 let diagnostics: DiagnosticCollection | undefined;
 
@@ -20,6 +21,9 @@ const runescriptDiagnostics: RunescriptDiagnostic[] = [
   unknownIdenDiagnostic,
   unknownFileDiagnostic
 ]
+
+let diagnosticsSuspendDepth = 0;
+const pendingDiagnostics = new Map<string, MatchResult[]>();
 
 export function registerDiagnostics(context: ExtensionContext): void {
   diagnostics = languages.createDiagnosticCollection('runescript-extension-diagnostics');
@@ -52,6 +56,18 @@ export function setCustomDiagnostics(uri: Uri, diagnosticsList: Diagnostic[]): v
 }
 
 export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult[]): Promise<void> {
+  if (shouldSuppressDiagnostics(matchResults)) {
+    pendingDiagnostics.set(uri.fsPath, matchResults);
+    return;
+  }
+  if (diagnosticsSuspendDepth > 0) {
+    pendingDiagnostics.set(uri.fsPath, matchResults);
+    return;
+  }
+  return rebuildFileDiagnosticsNow(uri, matchResults);
+}
+
+async function rebuildFileDiagnosticsNow(uri: Uri, matchResults: MatchResult[]): Promise<void> {
   if (!getSettingValue(Settings.ShowDiagnostics) || !diagnostics) return;
   if (!isAdvancedFeaturesEnabled(uri)) {
     clearFileDiagnostics(uri);
@@ -81,6 +97,7 @@ export async function rebuildFileDiagnostics(uri: Uri, matchResults: MatchResult
 }
 
 export function handleFileUpdate(before?: FileIdentifiers, after?: FileIdentifiers): void {
+  if (diagnosticsSuspendDepth > 0) return;
   if (!diagnostics) return;
   const beforeDecs = before?.declarations ?? new Set<IdentifierKey>();
   const afterDecs = after?.declarations ?? new Set<IdentifierKey>();
@@ -96,6 +113,10 @@ export function handleFileUpdate(before?: FileIdentifiers, after?: FileIdentifie
     if (!beforeDecs.has(key)) {
       addedDeclarations.push(key);
     }
+  }
+
+  if (addedDeclarations.some(key => shouldSuppressDiagnosticsForKey(key)) || removedDeclarations.some(key => shouldSuppressDiagnosticsForKey(key))) {
+    return;
   }
 
   // New declaration added: clear any cached "unknown identifier" diagnostics for this identifier key.
@@ -124,6 +145,27 @@ export function handleFileUpdate(before?: FileIdentifiers, after?: FileIdentifie
       }
       diagnostics.set(uri, fileDiagnostics);
     }
+  }
+}
+
+export function suspendDiagnosticsUpdates(): void {
+  diagnosticsSuspendDepth++;
+}
+
+export async function resumeDiagnosticsUpdates(): Promise<void> {
+  if (diagnosticsSuspendDepth === 0) return;
+  diagnosticsSuspendDepth--;
+  if (diagnosticsSuspendDepth > 0) return;
+  await flushPendingDiagnostics();
+}
+
+export async function flushPendingDiagnostics(): Promise<void> {
+  if (diagnosticsSuspendDepth > 0) return;
+  if (pendingDiagnostics.size === 0) return;
+  const entries = Array.from(pendingDiagnostics.entries());
+  pendingDiagnostics.clear();
+  for (const [fsPath, matchResults] of entries) {
+    await rebuildFileDiagnosticsNow(Uri.file(fsPath), matchResults);
   }
 }
 

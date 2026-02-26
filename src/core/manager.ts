@@ -3,7 +3,7 @@ import type { MatchResult, ParsedFile } from "../types";
 import { ProgressLocation, window, workspace } from "vscode";
 import { getActiveFile, getFileText, isActiveFile } from "../utils/fileUtils";
 import { matchFile } from "../matching/matchingEngine";
-import { clear as clearActiveFileCache, init as initActiveFilecache } from "../cache/activeFileCache";
+import { clear as clearActiveFileCache, init as initActiveFilecache, restore as restoreActiveFileCache, snapshot as snapshotActiveFileCache } from "../cache/activeFileCache";
 import { clearAllDiagnostics, clearFileDiagnostics, handleFileUpdate, rebuildFileDiagnostics, registerDiagnostics } from "./diagnostics";
 import { rebuildSemanticTokens } from "../provider/semanticTokensProvider";
 import { rebuildHighlights } from "./highlights";
@@ -121,6 +121,9 @@ async function rebuildAllFiles(recordMetrics = isDevMode()): Promise<void> {
  */
 async function rebuildFile(uri: Uri, lines: string[], parsedFile: ParsedFile, quiet = false): Promise<void> { 
   if (!parsedFile) return;
+  const activeFile = getActiveFile();
+  const shouldPreserveActiveCache = activeFile && activeFile.fsPath !== uri.fsPath;
+  const activeSnapshot = shouldPreserveActiveCache ? snapshotActiveFileCache() : undefined;
   const startTime = performance.now();
   const startIdentifiers = getFileIdentifiers(uri);
   clearFile(uri);
@@ -131,6 +134,9 @@ async function rebuildFile(uri: Uri, lines: string[], parsedFile: ParsedFile, qu
   if (isActiveFile(uri)) {
     rebuildSemanticTokens();
     rebuildHighlights();
+  }
+  if (activeSnapshot) {
+    restoreActiveFileCache(activeSnapshot);
   }
   if (!quiet) logFileRebuild(startTime, uri, fileMatches);
 }
