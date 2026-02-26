@@ -109,7 +109,7 @@ export function matchFile(uri: Uri, parsedFile: ParsedFile, lines: string[], dec
     }
     // Operator matching is separately handled and occurs per line, using the now processed matchResults
     if (isRunescript) {
-      const operatorMatches: MatchResult[] = matchFromOperators(parsedFile, lineNum);
+      const operatorMatches: MatchResult[] = matchFromOperators(parsedFile, lineNum, uri, lineText, fileInfo);
       if (operatorMatches.length === 0) continue;
       insertLineMatches(operatorMatches);
       fileMatches.push(...operatorMatches);
