@@ -29,6 +29,8 @@ const configKeys: Record<string, ConfigKeyData> = {
   multiloc: { params: ['int', 'loc'] },
   multinpc: { params: ['int', 'npc'] },
   basevar: { params: ['var'] },
+  certlink: { params: ['obj'] },
+  certtemplate: { params: ['obj'] },
 
   category: { params: ['category'] },
   huntmode: { params: ['hunt'] },
